@@ -310,6 +310,8 @@ public:
 		PIPELINE_STAGE_ALL_GRAPHICS_BIT = (1 << 15),
 		PIPELINE_STAGE_ALL_COMMANDS_BIT = (1 << 16),
 		PIPELINE_STAGE_CLEAR_STORAGE_BIT = (1 << 17),
+		PIPELINE_STAGE_TASK_SHADER_BIT = (1 << 19),
+		PIPELINE_STAGE_MESH_SHADER_BIT = (1 << 20),
 		PIPELINE_STAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT = (1 << 22),
 		PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT = (1 << 23),
 	};
@@ -649,6 +651,8 @@ public:
 	virtual void command_render_draw_indexed_indirect_count(CommandBufferID p_cmd_buffer, BufferID p_indirect_buffer, uint64_t p_offset, BufferID p_count_buffer, uint64_t p_count_buffer_offset, uint32_t p_max_draw_count, uint32_t p_stride) = 0;
 	virtual void command_render_draw_indirect(CommandBufferID p_cmd_buffer, BufferID p_indirect_buffer, uint64_t p_offset, uint32_t p_draw_count, uint32_t p_stride) = 0;
 	virtual void command_render_draw_indirect_count(CommandBufferID p_cmd_buffer, BufferID p_indirect_buffer, uint64_t p_offset, BufferID p_count_buffer, uint64_t p_count_buffer_offset, uint32_t p_max_draw_count, uint32_t p_stride) = 0;
+	virtual void command_render_dispatch_mesh_indirect(CommandBufferID p_cmd_buffer, BufferID p_indirect_buffer, uint64_t p_offset, uint32_t p_draw_count, uint32_t p_stride) = 0;
+	virtual void command_render_dispatch_mesh_indirect_count(CommandBufferID p_cmd_buffer, BufferID p_indirect_buffer, uint64_t p_offset, BufferID p_count_buffer, uint64_t p_count_buffer_offset, uint32_t p_max_draw_count, uint32_t p_stride) = 0;
 
 	// Buffer binding.
 	virtual void command_render_bind_vertex_buffers(CommandBufferID p_cmd_buffer, uint32_t p_binding_count, const BufferID *p_buffers, const uint64_t *p_offsets) = 0;
@@ -775,6 +779,16 @@ public:
 		bool offset_supported = false;
 	};
 
+	struct MeshShaderCapabilities {
+		bool mesh_shader_supported = false;
+		bool task_shader_supported = false;
+		bool mesh_shader_queries_supported = false;
+		bool mesh_shader_multiview_supported = false;
+		bool mesh_shader_primitive_fragment_shading_rate_supported = false;
+		uint32_t max_task_group_count[3] = {0, 0, 0};
+		uint32_t max_mesh_group_count[3] = {0, 0, 0};
+	};
+
 	enum ApiTrait {
 		API_TRAIT_HONORS_PIPELINE_BARRIERS,
 		API_TRAIT_SHADER_CHANGE_INVALIDATION,
@@ -818,6 +832,7 @@ public:
 	virtual const MultiviewCapabilities &get_multiview_capabilities() = 0;
 	virtual const FragmentShadingRateCapabilities &get_fragment_shading_rate_capabilities() = 0;
 	virtual const FragmentDensityMapCapabilities &get_fragment_density_map_capabilities() = 0;
+	virtual const MeshShaderCapabilities &get_mesh_shader_capabilities() = 0;
 	virtual String get_api_name() const = 0;
 	virtual String get_api_version() const = 0;
 	virtual String get_pipeline_cache_uuid() const = 0;

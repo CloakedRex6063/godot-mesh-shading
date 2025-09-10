@@ -29,10 +29,13 @@
 /**************************************************************************/
 
 #include "rendering_server.h"
+#include "core/object/object.h"
+#include "core/variant/variant.h"
 #include "rendering_server.compat.inc"
 
 #include "core/config/project_settings.h"
 #include "core/variant/typed_array.h"
+#include "servers/rendering/rendering_device.h"
 #include "servers/rendering/shader_language.h"
 #include "servers/rendering/shader_warnings.h"
 
@@ -3765,6 +3768,8 @@ void RenderingServer::init() {
 		GLOBAL_DEF("debug/shader_language/warnings/" + ShaderWarning::get_name_from_code((ShaderWarning::Code)i).to_lower(), true);
 	}
 #endif
+
+	GLOBAL_DEF("rendering/rendering_device/use_mesh_shader", false);
 }
 
 RenderingServer::~RenderingServer() {
