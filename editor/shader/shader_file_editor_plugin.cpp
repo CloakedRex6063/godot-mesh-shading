@@ -264,7 +264,9 @@ ShaderFileEditor::ShaderFileEditor() {
 		"Fragment",
 		"TessControl",
 		"TessEval",
-		"Compute"
+		"Compute",
+		"Mesh",
+		"Task"
 	};
 
 	stage_hb = memnew(HBoxContainer);

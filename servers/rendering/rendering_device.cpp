@@ -3475,6 +3475,12 @@ RID RenderingDevice::shader_create_from_bytecode_with_samplers(const Vector<uint
 			case SHADER_STAGE_COMPUTE:
 				shader->stage_bits.set_flag(RDD::PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 				break;
+			case SHADER_STAGE_MESH:
+				shader->stage_bits.set_flag(RDD::PIPELINE_STAGE_MESH_SHADER_BIT);
+				break;
+			case SHADER_STAGE_TASK:
+				shader->stage_bits.set_flag(RDD::PIPELINE_STAGE_TASK_SHADER_BIT);
+				break;
 			default:
 				DEV_ASSERT(false && "Unknown shader stage.");
 				break;
@@ -3983,8 +3989,9 @@ RID RenderingDevice::render_pipeline_create(RID p_shader, FramebufferFormatID p_
 	ERR_FAIL_NULL_V(shader, RID());
 	ERR_FAIL_COND_V_MSG(shader->is_compute, RID(), "Compute shaders can't be used in render pipelines");
 
-	// Validate pre-raster shader. One of stages must be vertex shader or mesh shader (not implemented yet).
-	ERR_FAIL_COND_V_MSG(!shader->stage_bits.has_flag(RDD::PIPELINE_STAGE_VERTEX_SHADER_BIT), RID(), "Pre-raster shader (vertex shader) is not provided for pipeline creation.");
+	// Validate pre-raster shader. One of stages must be vertex shader or mesh shader .
+	ERR_FAIL_COND_V_MSG(!shader->stage_bits.has_flag(RDD::PIPELINE_STAGE_VERTEX_SHADER_BIT) &&
+		!shader->stage_bits.has_flag(RDD::PIPELINE_STAGE_MESH_SHADER_BIT), RID(), "Pre-raster shader (vertex shader or mesh shader) is not provided for pipeline creation.");
 
 	FramebufferFormat fb_format;
 	{
@@ -7984,12 +7991,16 @@ void RenderingDevice::_bind_methods() {
 	BIND_ENUM_CONSTANT(SHADER_STAGE_TESSELATION_CONTROL);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_TESSELATION_EVALUATION);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_COMPUTE);
+	BIND_ENUM_CONSTANT(SHADER_STAGE_MESH);
+	BIND_ENUM_CONSTANT(SHADER_STAGE_TASK);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_MAX);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_VERTEX_BIT);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_FRAGMENT_BIT);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_TESSELATION_CONTROL_BIT);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_TESSELATION_EVALUATION_BIT);
 	BIND_ENUM_CONSTANT(SHADER_STAGE_COMPUTE_BIT);
+	BIND_ENUM_CONSTANT(SHADER_STAGE_MESH_BIT);
+	BIND_ENUM_CONSTANT(SHADER_STAGE_TASK_BIT);
 
 	BIND_ENUM_CONSTANT(SHADER_LANGUAGE_GLSL);
 	BIND_ENUM_CONSTANT(SHADER_LANGUAGE_HLSL);
