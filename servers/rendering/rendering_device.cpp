@@ -29,9 +29,12 @@
 /**************************************************************************/
 
 #include "rendering_device.h"
+#include "core/error/error_macros.h"
 #include "rendering_device.compat.inc"
 
 #include "rendering_device_binds.h"
+#include "servers/rendering/rendering_device_commons.h"
+#include "servers/rendering/rendering_device_driver.h"
 #include "shader_include_db.h"
 
 #include "core/config/project_settings.h"
@@ -5027,6 +5030,87 @@ void RenderingDevice::draw_list_set_viewport(DrawListID p_list, const Rect2 &p_r
 
 	draw_list.viewport = p_rect;
 	draw_graph.add_draw_list_set_viewport(p_rect);
+}
+
+void RenderingDevice::draw_list_dispatch_mesh(DrawListID p_list, uint32_t p_group_count_x, uint32_t p_group_count_y, uint32_t p_group_count_z) {
+	ERR_FAIL_COND(!draw_list.active);
+
+	#ifdef DEBUG_ENABLED
+		ERR_FAIL_COND_MSG(has_feature(SUPPORTS_MESH_SHADER), "Mesh shader is not supported by your gpu");
+		ERR_FAIL_COND_MSG(p_group_count_x == 0, "Group count x must be greater than zero");
+		ERR_FAIL_COND_MSG(p_group_count_y == 0, "Group count y must be greater than zero");
+		ERR_FAIL_COND_MSG(p_group_count_z == 0, "Group count z must be greater than zero");
+		const Shader* shader = shader_owner.get_or_null(draw_list.state.pipeline_shader);
+		if(shader->stage_bits.has_flag(RDD::PIPELINE_STAGE_MESH_SHADER_BIT))
+		{
+			ERR_FAIL_COND_MSG(p_group_count_x <= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_X), "Group count x exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_y <= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_Y), "Group count y exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_z <= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_Z), "Group count z exceeds maximum allowed");
+		}
+		else if(shader->stage_bits.has_flag(RDD::PIPELINE_STAGE_TASK_SHADER_BIT))
+		{
+			ERR_FAIL_COND_MSG(p_group_count_x <= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_X), "Task Shader Invocation Group count x exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_y <= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_Y), "Task Shader Invocation Group count y exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_z <= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_Z), "Task Shader Invocation Group count z exceeds maximum allowed");
+		}
+		ERR_FAIL_COND_MSG(!draw_list.validation.pipeline_active, "No render pipeline was set before attempting to draw.");
+
+		if (draw_list.validation.pipeline_push_constant_size > 0) {
+			// Using push constants, check that they were supplied.
+			ERR_FAIL_COND_MSG(!draw_list.validation.pipeline_push_constant_supplied,
+					"The shader in this pipeline requires a push constant to be set before drawing, but it's not present.");
+		}
+
+		for (uint32_t i = 0; i < draw_list.state.set_count; i++) {
+			if (draw_list.state.sets[i].pipeline_expected_format == 0) {
+				// Nothing expected by this pipeline.
+				continue;
+			}
+
+			if (draw_list.state.sets[i].pipeline_expected_format != draw_list.state.sets[i].uniform_set_format) {
+				if (draw_list.state.sets[i].uniform_set_format == 0) {
+					ERR_FAIL_MSG(vformat("Uniforms were never supplied for set (%d) at the time of drawing, which are required by the pipeline.", i));
+				} else if (uniform_set_owner.owns(draw_list.state.sets[i].uniform_set)) {
+					UniformSet *us = uniform_set_owner.get_or_null(draw_list.state.sets[i].uniform_set);
+					ERR_FAIL_MSG(vformat("Uniforms supplied for set (%d):\n%s\nare not the same format as required by the pipeline shader. Pipeline shader requires the following bindings:\n%s", i, _shader_uniform_debug(us->shader_id, us->shader_set), _shader_uniform_debug(draw_list.state.pipeline_shader)));
+				} else {
+					ERR_FAIL_MSG(vformat("Uniforms supplied for set (%s, which was just freed) are not the same format as required by the pipeline shader. Pipeline shader requires the following bindings:\n%s", i, _shader_uniform_debug(draw_list.state.pipeline_shader)));
+				}
+			}
+		}
+	#endif
+
+	if (!driver->api_trait_get(RDD::API_TRAIT_HONORS_PIPELINE_BARRIERS)) {
+		for (uint32_t i = 0; i < draw_list.state.set_count; i++) {
+			if (draw_list.state.sets[i].pipeline_expected_format == 0) {
+				// Nothing expected by this pipeline.
+				continue;
+			}
+
+			draw_graph.add_draw_list_uniform_set_prepare_for_use(draw_list.state.pipeline_shader_driver_id, draw_list.state.sets[i].uniform_set_driver_id, i);
+		}
+	}
+
+	// Bind descriptor sets.
+	for (uint32_t i = 0; i < draw_list.state.set_count; i++) {
+		if (draw_list.state.sets[i].pipeline_expected_format == 0) {
+			continue; // Nothing expected by this pipeline.
+		}
+		if (!draw_list.state.sets[i].bound) {
+			// All good, see if this requires re-binding.
+			draw_graph.add_draw_list_bind_uniform_set(draw_list.state.pipeline_shader_driver_id, draw_list.state.sets[i].uniform_set_driver_id, i);
+
+			UniformSet *uniform_set = uniform_set_owner.get_or_null(draw_list.state.sets[i].uniform_set);
+			_uniform_set_update_shared(uniform_set);
+
+			draw_graph.add_draw_list_usages(uniform_set->draw_trackers, uniform_set->draw_trackers_usage);
+
+			draw_list.state.sets[i].bound = true;
+		}
+	}
+
+
+	draw_graph.add_draw_list_dispatch_mesh(p_group_count_x, p_group_count_y, p_group_count_z);
 }
 
 void RenderingDevice::draw_list_enable_scissor(DrawListID p_list, const Rect2 &p_rect) {
