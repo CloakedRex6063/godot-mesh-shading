@@ -31,6 +31,7 @@
 #include "rendering_device_driver_vulkan.h"
 
 #include "core/config/project_settings.h"
+#include "core/error/error_macros.h"
 #include "core/io/marshalls.h"
 #include "core/string/print_string.h"
 #include "servers/rendering/rendering_device_commons.h"
@@ -4894,6 +4895,7 @@ void RenderingDeviceDriverVulkan::command_render_draw_indirect_count(CommandBuff
 void RenderingDeviceDriverVulkan::command_render_dispatch_mesh(CommandBufferID p_cmd_buffer, uint32_t p_group_x, uint32_t p_group_y, uint32_t p_group_z) {
 	#ifdef DEBUG_ENABLED
 	ERR_FAIL_COND_EDMSG(GLOBAL_GET_CACHED(bool, "rendering/render_device/use_mesh_shader"), "Mesh shaders not enabled, please enable them in the project settings.");
+	ERR_FAIL_COND_EDMSG(mesh_shader_capabilities.mesh_shader_supported, "Mesh shaders not supported by the device.");
 	#endif
 	const CommandBufferInfo *command_buffer = (const CommandBufferInfo *)p_cmd_buffer.id;
 	vkCmdDrawMeshTasksEXT(command_buffer->vk_command_buffer, p_group_x, p_group_y, p_group_z);
@@ -4902,6 +4904,7 @@ void RenderingDeviceDriverVulkan::command_render_dispatch_mesh(CommandBufferID p
 void RenderingDeviceDriverVulkan::command_render_dispatch_mesh_indirect(CommandBufferID p_cmd_buffer, BufferID p_indirect_buffer, uint64_t p_offset, uint32_t p_draw_count, uint32_t p_stride) {
 	#ifdef DEBUG_ENABLED
 	ERR_FAIL_COND_EDMSG(GLOBAL_GET_CACHED(bool, "rendering/render_device/use_mesh_shader"), "Mesh shaders not enabled, please enable them in the project settings.");
+	ERR_FAIL_COND_EDMSG(mesh_shader_capabilities.mesh_shader_supported, "Mesh shaders not supported by the device.");
 	#endif
 	const CommandBufferInfo *command_buffer = (const CommandBufferInfo *)p_cmd_buffer.id;
 	const BufferInfo *indirect_buf_info = (const BufferInfo *)p_indirect_buffer.id;
@@ -4911,6 +4914,7 @@ void RenderingDeviceDriverVulkan::command_render_dispatch_mesh_indirect(CommandB
 void RenderingDeviceDriverVulkan::command_render_dispatch_mesh_indirect_count(CommandBufferID p_cmd_buffer, BufferID p_indirect_buffer, uint64_t p_offset, BufferID p_count_buffer, uint64_t p_count_buffer_offset, uint32_t p_max_draw_count, uint32_t p_stride) {
 	#ifdef DEBUG_ENABLED
 	ERR_FAIL_COND_EDMSG(GLOBAL_GET_CACHED(bool, "rendering/render_device/use_mesh_shader"), "Mesh shaders not enabled, please enable them in the project settings.");
+	ERR_FAIL_COND_EDMSG(mesh_shader_capabilities.mesh_shader_supported, "Mesh shaders not supported by the device.");
 	#endif
 	const CommandBufferInfo *command_buffer = (const CommandBufferInfo *)p_cmd_buffer.id;
 	const BufferInfo *indirect_buf_info = (const BufferInfo *)p_indirect_buffer.id;
