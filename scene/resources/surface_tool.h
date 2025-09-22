@@ -33,6 +33,7 @@
 #include "core/templates/local_vector.h"
 #include "scene/resources/mesh.h"
 #include "thirdparty/misc/mikktspace.h"
+#include "servers/rendering_server.h"
 
 class SurfaceTool : public RefCounted {
 	GDCLASS(SurfaceTool, RefCounted);
@@ -108,7 +109,11 @@ public:
 	typedef void (*RemapIndexFunc)(unsigned int *destination, const unsigned int *indices, size_t index_count, const unsigned int *remap);
 	static RemapIndexFunc remap_index_func;
 	static void strip_mesh_arrays(PackedVector3Array &r_vertices, PackedInt32Array &r_indices);
-
+	typedef size_t (*BuildMeshletBoundFunc)(size_t index_count, size_t max_vertices, size_t max_triangles);
+	static BuildMeshletBoundFunc build_meshlet_bound_func;
+	typedef size_t (*BuildMeshletFunc)(RS::Meshlet* meshlets, unsigned int* meshlet_vertices, unsigned char* meshlet_triangles, const unsigned int* indices, size_t index_count, const float* vertex_positions, size_t vertex_count, size_t vertex_positions_stride, size_t max_vertices, size_t max_triangles, float cone_weight);
+	static BuildMeshletFunc build_meshlet_func;
+	
 private:
 	struct VertexHasher {
 		static _FORCE_INLINE_ uint32_t hash(const Vertex &p_vtx);
@@ -238,6 +243,8 @@ public:
 	void append_from(const Ref<Mesh> &p_existing, int p_surface, const Transform3D &p_xform);
 	Ref<ArrayMesh> commit(const Ref<ArrayMesh> &p_existing = Ref<ArrayMesh>(), uint64_t p_compress_flags = 0);
 
+	void create_meshlets_from_surface_data(Vector<RS::Meshlet>* p_meshlets, Vector<uint32_t>* p_meshlet_vertices, Vector<uint32_t>* p_meshlet_triangles ,const RS::SurfaceData &p_surface_data, size_t max_vertices = 64, size_t max_triangles = 126);
+	
 	SurfaceTool();
 };
 
