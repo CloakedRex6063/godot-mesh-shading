@@ -133,6 +133,13 @@ public:
 		CUBEMAP_LAYER_BACK
 	};
 
+	struct Meshlet {
+		unsigned int vertex_offset;
+		unsigned int triangle_offset;
+		unsigned int vertex_count;
+		unsigned int triangle_count;
+	};
+
 	virtual RID texture_2d_create(const Ref<Image> &p_image) = 0;
 	virtual RID texture_2d_layered_create(const Vector<Ref<Image>> &p_layers, TextureLayeredType p_layered_type) = 0;
 	virtual RID texture_3d_create(Image::Format, int p_width, int p_height, int p_depth, bool p_mipmaps, const Vector<Ref<Image>> &p_data) = 0; //all slices, then all the mipmaps, must be coherent
@@ -280,7 +287,7 @@ public:
 		ARRAY_COLOR = 3, // RGBA8
 		ARRAY_TEX_UV = 4, // RG32F or RG16
 		ARRAY_TEX_UV2 = 5, // RG32F or RG16
-		ARRAY_CUSTOM0 = 6, // Depends on ArrayCustomFormat.
+		ARRAY_CUSTOM0 = 6, // Depends on ArrayCustomFormat. 
 		ARRAY_CUSTOM1 = 7,
 		ARRAY_CUSTOM2 = 8,
 		ARRAY_CUSTOM3 = 9,
@@ -373,7 +380,11 @@ public:
 		uint32_t vertex_count = 0;
 		Vector<uint8_t> index_data;
 		uint32_t index_count = 0;
-
+		Vector<uint8_t> meshlet_data;
+		uint32_t meshlet_count = 0;
+		Vector<uint8_t> meshlet_vertex_data;
+		uint32_t meshlet_vertex_count = 0;
+		
 		AABB aabb;
 		struct LOD {
 			float edge_length = 0.0f;

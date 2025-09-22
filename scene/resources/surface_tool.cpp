@@ -42,6 +42,8 @@ SurfaceTool::SimplifyScaleFunc SurfaceTool::simplify_scale_func = nullptr;
 SurfaceTool::GenerateRemapFunc SurfaceTool::generate_remap_func = nullptr;
 SurfaceTool::RemapVertexFunc SurfaceTool::remap_vertex_func = nullptr;
 SurfaceTool::RemapIndexFunc SurfaceTool::remap_index_func = nullptr;
+SurfaceTool::BuildMeshletBoundFunc SurfaceTool::build_meshlet_bound_func = nullptr;
+SurfaceTool::BuildMeshletFunc SurfaceTool::build_meshlet_func = nullptr;
 
 void SurfaceTool::strip_mesh_arrays(PackedVector3Array &r_vertices, PackedInt32Array &r_indices) {
 	ERR_FAIL_COND_MSG(!generate_remap_func || !remap_vertex_func || !remap_index_func, "Meshoptimizer library is not initialized.");
@@ -742,6 +744,9 @@ Ref<ArrayMesh> SurfaceTool::commit(const Ref<ArrayMesh> &p_existing, uint64_t p_
 	}
 
 	return mesh;
+}
+void SurfaceTool::create_meshlets_from_surface_data(Vector<RenderingServer::Meshlet> *p_meshlets, Vector<uint32_t> *p_meshlet_vertices, Vector<uint32_t> *p_meshlet_triangles, const RenderingServer::SurfaceData &p_surface_data, size_t max_vertices, size_t max_triangles) {
+
 }
 
 void SurfaceTool::index() {

@@ -30,6 +30,8 @@
 
 #include "mesh_storage.h"
 
+#include "scene/resources/surface_tool.h"
+
 using namespace RendererRD;
 
 MeshStorage *MeshStorage::singleton = nullptr;
@@ -393,6 +395,33 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 		}
 	}
 
+	if (true) // Check if mesh shading is supported
+	{
+		Ref<SurfaceTool> st = memnew(SurfaceTool);
+		Vector<RS::Meshlet> meshlets;
+		Vector<uint32_t> meshlet_vertices;
+		Vector<uint32_t> meshlet_triangles;
+		st->create_meshlets_from_surface_data(&meshlets, &meshlet_vertices, &meshlet_triangles, new_surface);
+	}
+	
+	if (new_surface.meshlet_data.size()) {
+		Vector<uint8_t> meshlet_data;
+		meshlet_data.resize_initialized(new_surface.meshlet_data.size());
+
+		memcpy(meshlet_data.ptrw(), new_surface.meshlet_data.ptr(), new_surface.meshlet_data.size());
+		s->meshlet_buffer = RD::get_singleton()->storage_buffer_create(meshlet_data.size(), meshlet_data);
+		s->meshlet_buffer_size = meshlet_data.size();
+	}
+
+	if (new_surface.meshlet_vertex_data.size()) {
+		Vector<uint8_t> meshlet_vertex_data;
+		meshlet_vertex_data.resize_initialized(new_surface.meshlet_vertex_data.size() * sizeof(uint32_t));
+
+		memcpy(meshlet_vertex_data.ptrw(), new_surface.meshlet_data.ptr(), new_surface.meshlet_data.size() * sizeof(uint32_t));
+		s->meshlet_vertex_buffer = RD::get_singleton()->storage_buffer_create(meshlet_vertex_data.size(), meshlet_vertex_data);
+		s->meshlet_vertex_buffer_size = meshlet_vertex_data.size();
+	}
+
 	if (new_surface.attribute_data.size()) {
 		s->attribute_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.attribute_data.size(), new_surface.attribute_data);
 		s->attribute_buffer_size = new_surface.attribute_data.size();
@@ -473,6 +502,28 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
 			if (s->blend_shape_buffer.is_valid()) {
 				u.append_id(s->blend_shape_buffer);
+			} else {
+				u.append_id(default_rd_storage_buffer);
+			}
+			uniforms.push_back(u);
+		}
+		{
+			RD::Uniform u;
+			u.binding = 3;
+			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
+			if (s->meshlet_buffer.is_valid()) {
+				u.append_id(s->meshlet_buffer);
+			} else {
+				u.append_id(default_rd_storage_buffer);
+			}
+			uniforms.push_back(u);
+		}
+		{
+			RD::Uniform u;
+			u.binding = 4;
+			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
+			if (s->meshlet_vertex_buffer.is_valid()) {
+				u.append_id(s->meshlet_vertex_buffer);
 			} else {
 				u.append_id(default_rd_storage_buffer);
 			}
@@ -656,6 +707,15 @@ RS::SurfaceData MeshStorage::mesh_get_surface(RID p_mesh, int p_surface) const {
 	if (s.skin_buffer.is_valid()) {
 		sd.skin_data = RD::get_singleton()->buffer_get_data(s.skin_buffer);
 	}
+
+	if (s.meshlet_buffer.is_valid()) {
+		sd.meshlet_data = RD::get_singleton()->buffer_get_data(s.meshlet_buffer);
+	}
+
+	if (s.meshlet_vertex_buffer.is_valid()) {
+		sd.meshlet_vertex_data = RD::get_singleton()->buffer_get_data(s.meshlet_vertex_buffer);
+	}
+	
 	sd.vertex_count = s.vertex_count;
 	sd.index_count = s.index_count;
 	sd.primitive = s.primitive;

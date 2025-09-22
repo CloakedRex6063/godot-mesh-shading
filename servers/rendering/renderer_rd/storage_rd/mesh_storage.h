@@ -85,6 +85,12 @@ private:
 			RID attribute_buffer;
 			uint32_t attribute_buffer_size = 0;
 
+			RID meshlet_buffer;
+			uint32_t meshlet_buffer_size = 0;
+
+			RID meshlet_vertex_buffer;
+			uint32_t meshlet_vertex_buffer_size = 0;
+
 			RID skin_buffer;
 			uint32_t skin_buffer_size = 0;
 
@@ -136,7 +142,7 @@ private:
 
 			RID blend_shape_buffer;
 			uint32_t blend_shape_buffer_size = 0;
-
+			
 			RID material;
 
 			uint32_t render_index = 0;
