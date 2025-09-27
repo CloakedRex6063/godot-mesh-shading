@@ -839,9 +839,6 @@ void Mesh::_bind_methods() {
 	BIND_ENUM_CONSTANT(ARRAY_TEX_UV);
 	BIND_ENUM_CONSTANT(ARRAY_TEX_UV2);
 	BIND_ENUM_CONSTANT(ARRAY_CUSTOM0);
-	BIND_ENUM_CONSTANT(ARRAY_CUSTOM1);
-	BIND_ENUM_CONSTANT(ARRAY_CUSTOM2);
-	BIND_ENUM_CONSTANT(ARRAY_CUSTOM3);
 	BIND_ENUM_CONSTANT(ARRAY_BONES);
 	BIND_ENUM_CONSTANT(ARRAY_WEIGHTS);
 	BIND_ENUM_CONSTANT(ARRAY_INDEX);
@@ -864,9 +861,6 @@ void Mesh::_bind_methods() {
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_TEX_UV);
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_TEX_UV2);
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM0);
-	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM1);
-	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM2);
-	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM3);
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_BONES);
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_WEIGHTS);
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_INDEX);
@@ -876,9 +870,6 @@ void Mesh::_bind_methods() {
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM_BASE);
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM_BITS);
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM0_SHIFT);
-	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM1_SHIFT);
-	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM2_SHIFT);
-	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM3_SHIFT);
 
 	BIND_BITFIELD_FLAG(ARRAY_FORMAT_CUSTOM_MASK);
 	BIND_BITFIELD_FLAG(ARRAY_COMPRESS_FLAGS_BASE);
@@ -1684,7 +1675,7 @@ void ArrayMesh::_set_surfaces(const Array &p_surfaces) {
 		}
 	} else {
 		// if mesh does not exist (first time this is loaded, most likely),
-		// we can create it with a single call, which is a lot more efficient and thread friendly
+		// we can create it witha single call, which is a lot more efficient and thread friendly
 		mesh = RS::get_singleton()->mesh_create_from_surfaces(surface_data, blend_shapes.size());
 		RS::get_singleton()->mesh_set_blend_shape_mode(mesh, (RS::BlendShapeMode)blend_shape_mode);
 		RS::get_singleton()->mesh_set_path(mesh, get_path());

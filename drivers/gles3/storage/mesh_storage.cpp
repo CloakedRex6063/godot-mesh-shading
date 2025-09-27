@@ -153,12 +153,12 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 							attrib_stride += sizeof(float) * 2;
 						}
 					} break;
-					case RS::ARRAY_CUSTOM0:
-					case RS::ARRAY_CUSTOM1:
-					case RS::ARRAY_CUSTOM2:
-					case RS::ARRAY_CUSTOM3: {
-						int idx = i - RS::ARRAY_CUSTOM0;
-						uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT, RS::ARRAY_FORMAT_CUSTOM1_SHIFT, RS::ARRAY_FORMAT_CUSTOM2_SHIFT, RS::ARRAY_FORMAT_CUSTOM3_SHIFT };
+					case RS::ARRAY_MESHLET:
+					case RS::ARRAY_MESHLET_VERTEX:
+					case RS::ARRAY_MESHLET_TRIANGLE:
+					case RS::ARRAY_CUSTOM0: {
+						int idx = i - RS::ARRAY_MESHLET;
+						uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT };
 						uint32_t fmt = (p_surface.format >> fmt_shift[idx]) & RS::ARRAY_FORMAT_CUSTOM_MASK;
 						uint32_t fmtsize[RS::ARRAY_CUSTOM_MAX] = { 4, 4, 4, 8, 4, 8, 12, 16 };
 						attrib_stride += fmtsize[fmt];
@@ -978,14 +978,14 @@ void MeshStorage::_mesh_surface_generate_version_for_input_mask(Mesh::Surface::V
 					attribs[i].normalized = GL_FALSE;
 				}
 			} break;
-			case RS::ARRAY_CUSTOM0:
-			case RS::ARRAY_CUSTOM1:
-			case RS::ARRAY_CUSTOM2:
-			case RS::ARRAY_CUSTOM3: {
+			case RS::ARRAY_MESHLET:
+			case RS::ARRAY_MESHLET_VERTEX:
+			case RS::ARRAY_MESHLET_TRIANGLE:
+			case RS::ARRAY_CUSTOM0: {
 				attribs[i].offset = attributes_stride;
 
-				int idx = i - RS::ARRAY_CUSTOM0;
-				uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT, RS::ARRAY_FORMAT_CUSTOM1_SHIFT, RS::ARRAY_FORMAT_CUSTOM2_SHIFT, RS::ARRAY_FORMAT_CUSTOM3_SHIFT };
+				int idx = i - RS::ARRAY_MESHLET;
+				uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT };
 				uint32_t fmt = (s->format >> fmt_shift[idx]) & RS::ARRAY_FORMAT_CUSTOM_MASK;
 				uint32_t fmtsize[RS::ARRAY_CUSTOM_MAX] = { 4, 4, 4, 8, 4, 8, 12, 16 };
 				GLenum gl_type[RS::ARRAY_CUSTOM_MAX] = { GL_UNSIGNED_BYTE, GL_BYTE, GL_HALF_FLOAT, GL_HALF_FLOAT, GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_FLOAT };
@@ -1028,7 +1028,7 @@ void MeshStorage::_mesh_surface_generate_version_for_input_mask(Mesh::Surface::V
 			} else {
 				glBindBuffer(GL_ARRAY_BUFFER, s->vertex_buffer);
 			}
-		} else if (i <= RS::ARRAY_CUSTOM3) {
+		} else if (i <= RS::ARRAY_CUSTOM0) {
 			attribs[i].stride = attributes_stride;
 			glBindBuffer(GL_ARRAY_BUFFER, s->attribute_buffer);
 		} else {

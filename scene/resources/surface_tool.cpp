@@ -341,7 +341,7 @@ void SurfaceTool::set_custom(int p_channel_index, const Color &p_custom) {
 	ERR_FAIL_INDEX(p_channel_index, RS::ARRAY_CUSTOM_COUNT);
 	ERR_FAIL_COND(!begun);
 	ERR_FAIL_COND(last_custom_format[p_channel_index] == CUSTOM_MAX);
-	static const uint32_t mask[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0, Mesh::ARRAY_FORMAT_CUSTOM1, Mesh::ARRAY_FORMAT_CUSTOM2, Mesh::ARRAY_FORMAT_CUSTOM3 };
+	static const uint32_t mask[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0 };
 	ERR_FAIL_COND(!first && !(format & mask[p_channel_index]));
 
 	if (first) {
@@ -506,10 +506,7 @@ Array SurfaceTool::commit_to_arrays() {
 
 				a[i] = array;
 			} break;
-			case Mesh::ARRAY_CUSTOM0:
-			case Mesh::ARRAY_CUSTOM1:
-			case Mesh::ARRAY_CUSTOM2:
-			case Mesh::ARRAY_CUSTOM3: {
+			case Mesh::ARRAY_CUSTOM0: {
 				int fmt = i - Mesh::ARRAY_CUSTOM0;
 				switch (last_custom_format[fmt]) {
 					case CUSTOM_RGBA8_UNORM: {
@@ -730,7 +727,7 @@ Ref<ArrayMesh> SurfaceTool::commit(const Ref<ArrayMesh> &p_existing, uint64_t p_
 	Array a = commit_to_arrays();
 
 	uint64_t compress_flags = (p_compress_flags >> RS::ARRAY_COMPRESS_FLAGS_BASE) << RS::ARRAY_COMPRESS_FLAGS_BASE;
-	static const uint64_t shift[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0_SHIFT, Mesh::ARRAY_FORMAT_CUSTOM1_SHIFT, Mesh::ARRAY_FORMAT_CUSTOM2_SHIFT, Mesh::ARRAY_FORMAT_CUSTOM3_SHIFT };
+	static const uint64_t shift[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0_SHIFT };
 	for (int i = 0; i < RS::ARRAY_CUSTOM_COUNT; i++) {
 		if (last_custom_format[i] != CUSTOM_MAX) {
 			compress_flags |= uint64_t(last_custom_format[i]) << shift[i];
@@ -745,8 +742,96 @@ Ref<ArrayMesh> SurfaceTool::commit(const Ref<ArrayMesh> &p_existing, uint64_t p_
 
 	return mesh;
 }
-void SurfaceTool::create_meshlets_from_surface_data(Vector<RenderingServer::Meshlet> *p_meshlets, Vector<uint32_t> *p_meshlet_vertices, Vector<uint32_t> *p_meshlet_triangles, const RenderingServer::SurfaceData &p_surface_data, size_t max_vertices, size_t max_triangles) {
 
+void SurfaceTool::create_meshlets_from_mesh(Vector<RenderingServer::Meshlet> *p_meshlets, Vector<uint32_t> *p_meshlet_vertices, Vector<uint32_t> *p_meshlet_triangles, const RS::SurfaceData& surface_data, const size_t max_vertices, const size_t max_triangles) {
+	Vector<uint8_t> comp_triangles;
+	
+	const size_t max_meshlets = build_meshlet_bound_func(
+		surface_data.index_count, max_vertices, max_triangles);
+	p_meshlets->resize(max_meshlets);
+	p_meshlet_vertices->resize(max_meshlets * max_vertices);
+	comp_triangles.resize(max_meshlets * max_triangles * 3);
+	
+	const uint32_t index_stride = surface_data.index_data.size() / surface_data.index_count;
+	uint32_t vertex_stride = 0;
+	
+	for (int i = 0; i < RS::ARRAY_TANGENT; i++) {
+		if ((surface_data.format & (1ULL << i))) {
+			switch (i) {
+				case RS::ARRAY_VERTEX: {
+					if ((surface_data.format & RS::ARRAY_FLAG_USE_2D_VERTICES) || (surface_data.format & RS::ARRAY_FLAG_COMPRESS_ATTRIBUTES)) {
+						vertex_stride += sizeof(float) * 2;
+					} else {
+						vertex_stride += sizeof(float) * 3;
+					}
+
+				} break;
+				case RS::ARRAY_NORMAL: {
+					vertex_stride += sizeof(uint16_t) * 2;
+
+				} break;
+				case RS::ARRAY_TANGENT: {
+					if (!(surface_data.format & RS::ARRAY_FLAG_COMPRESS_ATTRIBUTES)) {
+						vertex_stride += sizeof(uint16_t) * 2;
+					}
+				} break;
+			}
+		}
+	}
+
+	Vector<uint32_t> indices;
+	indices.resize(surface_data.index_count);
+
+	const uint8_t* index_ptr = surface_data.index_data.ptr();
+	if (index_stride == sizeof(uint16_t)) {
+		for (uint32_t i = 0; i < surface_data.index_count; i++) {
+			indices.ptrw()[i] = *reinterpret_cast<const uint16_t*>(index_ptr + i * index_stride);
+		}
+	} else if (index_stride == sizeof(uint32_t)) {
+		for (uint32_t i = 0; i < surface_data.index_count; i++) {
+			indices.ptrw()[i] = *reinterpret_cast<const uint32_t*>(index_ptr + i * index_stride);
+		}
+	}
+	
+	const size_t meshlet_count = build_meshlet_func(p_meshlets->ptrw(),
+			p_meshlet_vertices->ptrw(),
+			comp_triangles.ptrw(),
+			indices.ptr(),
+			surface_data.index_count,
+			reinterpret_cast<const float *>(surface_data.vertex_data.ptr()),
+			surface_data.vertex_count,
+			vertex_stride,
+			max_vertices,
+			max_triangles,
+			0.0);
+	const RS::Meshlet& meshlet = p_meshlets->ptr()[
+		meshlet_count - 1];
+	p_meshlet_vertices->resize(meshlet.vertex_offset + meshlet.vertex_count);
+	comp_triangles.resize(meshlet.triangle_offset + (meshlet.triangle_count * 3 + 3 & ~3));
+	p_meshlets->resize(meshlet_count);
+	*p_meshlet_triangles = _repack_triangles(p_meshlets, comp_triangles);
+}
+
+Vector<uint32_t> SurfaceTool::_repack_triangles(Vector<RS::Meshlet>* meshlets, const Span<uint8_t> meshlet_triangles) {
+	Vector<uint32_t> repacked_meshlets;
+	for (RS::Meshlet& m : *meshlets)
+	{
+		const uint32_t triangle_offset = static_cast<uint32_t>(repacked_meshlets.size());
+
+		for (uint32_t i = 0; i < m.triangle_count; ++i)
+		{
+			const uint8_t idx0 = meshlet_triangles[m.triangle_offset + i * 3 + 0];
+			const uint8_t idx1 = meshlet_triangles[m.triangle_offset + i * 3 + 1];
+			const uint8_t idx2 = meshlet_triangles[m.triangle_offset + i * 3 + 2];
+			const uint8_t packed = (static_cast<uint32_t>(idx0) & 0xFF) << 0 |
+				(static_cast<uint32_t>(idx1) & 0xFF) << 8 |
+				(static_cast<uint32_t>(idx2) & 0xFF) << 16;
+			repacked_meshlets.push_back(packed);
+		}
+
+		m.triangle_offset = triangle_offset;
+	}
+	return repacked_meshlets;
 }
 
 void SurfaceTool::index() {
@@ -799,8 +884,8 @@ void SurfaceTool::_create_list(const Ref<Mesh> &p_existing, int p_surface, Local
 	_create_list_from_arrays(arr, r_vertex, r_index, lformat);
 }
 
-const uint32_t SurfaceTool::custom_mask[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0, Mesh::ARRAY_FORMAT_CUSTOM1, Mesh::ARRAY_FORMAT_CUSTOM2, Mesh::ARRAY_FORMAT_CUSTOM3 };
-const uint32_t SurfaceTool::custom_shift[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0_SHIFT, Mesh::ARRAY_FORMAT_CUSTOM1_SHIFT, Mesh::ARRAY_FORMAT_CUSTOM2_SHIFT, Mesh::ARRAY_FORMAT_CUSTOM3_SHIFT };
+const uint32_t SurfaceTool::custom_mask[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0 };
+const uint32_t SurfaceTool::custom_shift[RS::ARRAY_CUSTOM_COUNT] = { Mesh::ARRAY_FORMAT_CUSTOM0_SHIFT };
 
 void SurfaceTool::create_vertex_array_from_arrays(const Array &p_arrays, LocalVector<SurfaceTool::Vertex> &ret, uint64_t *r_format) {
 	ERR_FAIL_INDEX(RS::ARRAY_WEIGHTS, p_arrays.size());
@@ -860,10 +945,10 @@ void SurfaceTool::create_vertex_array_from_arrays(const Array &p_arrays, LocalVe
 	}
 
 	for (int i = 0; i < RS::ARRAY_CUSTOM_COUNT; i++) {
-		ERR_CONTINUE_MSG(p_arrays[RS::ARRAY_CUSTOM0 + i].get_type() == Variant::PACKED_BYTE_ARRAY, "Extracting Byte/Half formats is not supported");
-		if (p_arrays[RS::ARRAY_CUSTOM0 + i].get_type() == Variant::PACKED_FLOAT32_ARRAY) {
+		ERR_CONTINUE_MSG(p_arrays[RS::ARRAY_MESHLET + i].get_type() == Variant::PACKED_BYTE_ARRAY, "Extracting Byte/Half formats is not supported");
+		if (p_arrays[RS::ARRAY_MESHLET + i].get_type() == Variant::PACKED_FLOAT32_ARRAY) {
 			lformat |= custom_mask[i];
-			custom_float[i] = p_arrays[RS::ARRAY_CUSTOM0 + i];
+			custom_float[i] = p_arrays[RS::ARRAY_MESHLET + i];
 			int fmt = custom_float[i].size() / varr.size();
 			if (fmt == 1) {
 				lformat |= CUSTOM_R_FLOAT << custom_shift[i];
