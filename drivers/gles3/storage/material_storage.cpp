@@ -2661,8 +2661,8 @@ void CanvasShaderData::set_code(const String &p_code) {
 	ERR_FAIL_COND(!MaterialStorage::get_singleton()->shaders.canvas_shader.version_is_valid(version));
 
 	vertex_input_mask = RS::ARRAY_FORMAT_VERTEX | RS::ARRAY_FORMAT_COLOR | RS::ARRAY_FORMAT_TEX_UV;
-	vertex_input_mask |= uses_custom0 << RS::ARRAY_CUSTOM0;
-	vertex_input_mask |= uses_custom1 << RS::ARRAY_CUSTOM1;
+	vertex_input_mask |= uses_custom0 << RS::ARRAY_MESHLET;
+	vertex_input_mask |= uses_custom1 << RS::ARRAY_MESHLET_VERTEX;
 
 	ubo_size = gen_code.uniform_total_size;
 	ubo_offsets = gen_code.uniform_offsets;
@@ -3071,10 +3071,10 @@ void SceneShaderData::set_code(const String &p_code) {
 	vertex_input_mask |= uses_color << RS::ARRAY_COLOR;
 	vertex_input_mask |= uses_uv << RS::ARRAY_TEX_UV;
 	vertex_input_mask |= uses_uv2 << RS::ARRAY_TEX_UV2;
-	vertex_input_mask |= uses_custom0 << RS::ARRAY_CUSTOM0;
-	vertex_input_mask |= uses_custom1 << RS::ARRAY_CUSTOM1;
-	vertex_input_mask |= uses_custom2 << RS::ARRAY_CUSTOM2;
-	vertex_input_mask |= uses_custom3 << RS::ARRAY_CUSTOM3;
+	vertex_input_mask |= uses_custom0 << RS::ARRAY_MESHLET;
+	vertex_input_mask |= uses_custom1 << RS::ARRAY_MESHLET_VERTEX;
+	vertex_input_mask |= uses_custom2 << RS::ARRAY_MESHLET_TRIANGLE;
+	vertex_input_mask |= uses_custom3 << RS::ARRAY_CUSTOM0;
 	vertex_input_mask |= uses_bones << RS::ARRAY_BONES;
 	vertex_input_mask |= uses_weights << RS::ARRAY_WEIGHTS;
 

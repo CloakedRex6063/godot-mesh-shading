@@ -263,7 +263,7 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 	ERR_FAIL_NULL(mesh);
 
 	ERR_FAIL_COND(mesh->surface_count == RS::MAX_MESH_SURFACES);
-
+	
 #ifdef DEBUG_ENABLED
 	//do a validation, to catch errors first
 	{
@@ -310,12 +310,12 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 						}
 
 					} break;
-					case RS::ARRAY_CUSTOM0:
-					case RS::ARRAY_CUSTOM1:
-					case RS::ARRAY_CUSTOM2:
-					case RS::ARRAY_CUSTOM3: {
+					case RS::ARRAY_MESHLET:
+					case RS::ARRAY_MESHLET_VERTEX:
+					case RS::ARRAY_MESHLET_TRIANGLE:
+					case RS::ARRAY_CUSTOM0: {
 						int idx = i - RS::ARRAY_CUSTOM0;
-						const uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT, RS::ARRAY_FORMAT_CUSTOM1_SHIFT, RS::ARRAY_FORMAT_CUSTOM2_SHIFT, RS::ARRAY_FORMAT_CUSTOM3_SHIFT };
+						const uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT };
 						uint32_t fmt = (p_surface.format >> fmt_shift[idx]) & RS::ARRAY_FORMAT_CUSTOM_MASK;
 						const uint32_t fmtsize[RS::ARRAY_CUSTOM_MAX] = { 4, 4, 4, 8, 4, 8, 12, 16 };
 						attrib_stride += fmtsize[fmt];
@@ -395,31 +395,39 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 		}
 	}
 
-	if (true) // Check if mesh shading is supported
-	{
-		Ref<SurfaceTool> st = memnew(SurfaceTool);
-		Vector<RS::Meshlet> meshlets;
-		Vector<uint32_t> meshlet_vertices;
-		Vector<uint32_t> meshlet_triangles;
-		st->create_meshlets_from_surface_data(&meshlets, &meshlet_vertices, &meshlet_triangles, new_surface);
-	}
+	RenderingServer *rs = RenderingServer::get_singleton();
+	RenderingDevice *rd = rs->get_rendering_device();
 	
-	if (new_surface.meshlet_data.size()) {
-		Vector<uint8_t> meshlet_data;
-		meshlet_data.resize_initialized(new_surface.meshlet_data.size());
+	if (rd && rd->has_feature(RenderingDeviceCommons::Features::SUPPORTS_MESH_SHADER)) 
+	{
+		if (new_surface.lods.size()) {
+			if (new_surface.index_count) {
+				Ref<SurfaceTool> st = memnew(SurfaceTool);
+				Vector<RS::Meshlet> meshlets;
+				Vector<uint32_t> meshlet_vertices;
+				Vector<uint32_t> meshlet_triangles;
 
-		memcpy(meshlet_data.ptrw(), new_surface.meshlet_data.ptr(), new_surface.meshlet_data.size());
-		s->meshlet_buffer = RD::get_singleton()->storage_buffer_create(meshlet_data.size(), meshlet_data);
-		s->meshlet_buffer_size = meshlet_data.size();
-	}
+				st->create_meshlets_from_mesh(&meshlets, &meshlet_vertices, &meshlet_triangles, new_surface);
+				new_surface.meshlet_data.resize(meshlets.size() * sizeof(RS::Meshlet));
+				new_surface.meshlet_vertex_data.resize(meshlet_vertices.size() * sizeof(uint32_t));
+				new_surface.meshlet_triangle_data.resize(meshlet_triangles.size() * sizeof(uint32_t));
+				memcpy(new_surface.meshlet_data.ptrw(), meshlets.ptr(), meshlets.size() * sizeof(RS::Meshlet));
+				memcpy(new_surface.meshlet_vertex_data.ptrw(), meshlet_vertices.ptr(), meshlet_vertices.size() * sizeof(uint32_t));
+				memcpy(new_surface.meshlet_triangle_data.ptrw(), meshlet_triangles.ptr(), meshlet_triangles.size() * sizeof(uint32_t));
+				new_surface.meshlet_triangle_count = meshlet_triangles.size();
+				new_surface.meshlet_count = meshlets.size();
+				new_surface.meshlet_vertex_count = meshlet_vertices.size();
 
-	if (new_surface.meshlet_vertex_data.size()) {
-		Vector<uint8_t> meshlet_vertex_data;
-		meshlet_vertex_data.resize_initialized(new_surface.meshlet_vertex_data.size() * sizeof(uint32_t));
+				s->meshlet_buffer = RD::get_singleton()->storage_buffer_create(new_surface.meshlet_data.size(), new_surface.meshlet_data);
+				s->meshlet_buffer_size = new_surface.meshlet_data.size();
 
-		memcpy(meshlet_vertex_data.ptrw(), new_surface.meshlet_data.ptr(), new_surface.meshlet_data.size() * sizeof(uint32_t));
-		s->meshlet_vertex_buffer = RD::get_singleton()->storage_buffer_create(meshlet_vertex_data.size(), meshlet_vertex_data);
-		s->meshlet_vertex_buffer_size = meshlet_vertex_data.size();
+				s->meshlet_vertex_buffer = RD::get_singleton()->storage_buffer_create(new_surface.meshlet_vertex_data.size(), new_surface.meshlet_vertex_data);
+				s->meshlet_vertex_buffer_size = new_surface.meshlet_vertex_data.size();
+
+				//TODO: meshlet triangle buffer
+			}
+			
+		}
 	}
 
 	if (new_surface.attribute_data.size()) {
@@ -502,28 +510,6 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
 			if (s->blend_shape_buffer.is_valid()) {
 				u.append_id(s->blend_shape_buffer);
-			} else {
-				u.append_id(default_rd_storage_buffer);
-			}
-			uniforms.push_back(u);
-		}
-		{
-			RD::Uniform u;
-			u.binding = 3;
-			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
-			if (s->meshlet_buffer.is_valid()) {
-				u.append_id(s->meshlet_buffer);
-			} else {
-				u.append_id(default_rd_storage_buffer);
-			}
-			uniforms.push_back(u);
-		}
-		{
-			RD::Uniform u;
-			u.binding = 4;
-			u.uniform_type = RD::UNIFORM_TYPE_STORAGE_BUFFER;
-			if (s->meshlet_vertex_buffer.is_valid()) {
-				u.append_id(s->meshlet_vertex_buffer);
 			} else {
 				u.append_id(default_rd_storage_buffer);
 			}
@@ -1347,10 +1333,10 @@ RD::VertexFormatID MeshStorage::_mesh_surface_generate_vertex_format(uint64_t p_
 					break;
 				case RS::ARRAY_TANGENT:
 				case RS::ARRAY_COLOR:
+				case RS::ARRAY_MESHLET:
+				case RS::ARRAY_MESHLET_VERTEX:
+				case RS::ARRAY_MESHLET_TRIANGLE:
 				case RS::ARRAY_CUSTOM0:
-				case RS::ARRAY_CUSTOM1:
-				case RS::ARRAY_CUSTOM2:
-				case RS::ARRAY_CUSTOM3:
 				case RS::ARRAY_WEIGHTS:
 					vd.format = RD::DATA_FORMAT_R32G32B32A32_SFLOAT;
 					break;
@@ -1429,14 +1415,14 @@ RD::VertexFormatID MeshStorage::_mesh_surface_generate_vertex_format(uint64_t p_
 						attribute_stride += sizeof(float) * 2;
 					}
 				} break;
-				case RS::ARRAY_CUSTOM0:
-				case RS::ARRAY_CUSTOM1:
-				case RS::ARRAY_CUSTOM2:
-				case RS::ARRAY_CUSTOM3: {
+				case RS::ARRAY_MESHLET:
+				case RS::ARRAY_MESHLET_VERTEX:
+				case RS::ARRAY_MESHLET_TRIANGLE:
+				case RS::ARRAY_CUSTOM0: {
 					vd.offset = attribute_stride;
 
-					int idx = i - RS::ARRAY_CUSTOM0;
-					const uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT, RS::ARRAY_FORMAT_CUSTOM1_SHIFT, RS::ARRAY_FORMAT_CUSTOM2_SHIFT, RS::ARRAY_FORMAT_CUSTOM3_SHIFT };
+					int idx = i - RS::ARRAY_MESHLET;
+					const uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT };
 					uint32_t fmt = (p_surface_format >> fmt_shift[idx]) & RS::ARRAY_FORMAT_CUSTOM_MASK;
 					const uint32_t fmtsize[RS::ARRAY_CUSTOM_MAX] = { 4, 4, 4, 8, 4, 8, 12, 16 };
 					const RD::DataFormat fmtrd[RS::ARRAY_CUSTOM_MAX] = { RD::DATA_FORMAT_R8G8B8A8_UNORM, RD::DATA_FORMAT_R8G8B8A8_SNORM, RD::DATA_FORMAT_R16G16_SFLOAT, RD::DATA_FORMAT_R16G16B16A16_SFLOAT, RD::DATA_FORMAT_R32_SFLOAT, RD::DATA_FORMAT_R32G32_SFLOAT, RD::DATA_FORMAT_R32G32B32_SFLOAT, RD::DATA_FORMAT_R32G32B32A32_SFLOAT };
@@ -1535,10 +1521,10 @@ void MeshStorage::_mesh_surface_generate_version_for_input_mask(Mesh::Surface::V
 				case RS::ARRAY_COLOR:
 				case RS::ARRAY_TEX_UV:
 				case RS::ARRAY_TEX_UV2:
+				case RS::ARRAY_MESHLET:
+				case RS::ARRAY_MESHLET_VERTEX:
+				case RS::ARRAY_MESHLET_TRIANGLE:
 				case RS::ARRAY_CUSTOM0:
-				case RS::ARRAY_CUSTOM1:
-				case RS::ARRAY_CUSTOM2:
-				case RS::ARRAY_CUSTOM3:
 					buffer = s->attribute_buffer;
 					break;
 				case RS::ARRAY_BONES:

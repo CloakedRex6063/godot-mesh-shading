@@ -34,6 +34,10 @@
 
 #include "thirdparty/meshoptimizer/meshoptimizer.h"
 
+size_t build_meshlets(RS::Meshlet* meshlets, unsigned int* meshlet_vertices, unsigned char* meshlet_triangles, const unsigned int* indices, const size_t index_count, const float* vertex_positions, const size_t vertex_count, const size_t vertex_positions_stride, const size_t max_vertices, const size_t max_triangles, const float cone_weight) {
+	return meshopt_buildMeshlets(reinterpret_cast<meshopt_Meshlet*>(meshlets), meshlet_vertices, meshlet_triangles, indices, index_count, vertex_positions, vertex_count, vertex_positions_stride, max_vertices, max_triangles, cone_weight);
+}
+
 void initialize_meshoptimizer_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
@@ -47,6 +51,8 @@ void initialize_meshoptimizer_module(ModuleInitializationLevel p_level) {
 	SurfaceTool::generate_remap_func = meshopt_generateVertexRemap;
 	SurfaceTool::remap_vertex_func = meshopt_remapVertexBuffer;
 	SurfaceTool::remap_index_func = meshopt_remapIndexBuffer;
+	SurfaceTool::build_meshlet_bound_func = meshopt_buildMeshletsBound;
+	SurfaceTool::build_meshlet_func = build_meshlets;
 }
 
 void uninitialize_meshoptimizer_module(ModuleInitializationLevel p_level) {
@@ -61,4 +67,6 @@ void uninitialize_meshoptimizer_module(ModuleInitializationLevel p_level) {
 	SurfaceTool::generate_remap_func = nullptr;
 	SurfaceTool::remap_vertex_func = nullptr;
 	SurfaceTool::remap_index_func = nullptr;
+	SurfaceTool::build_meshlet_bound_func = nullptr;
+	SurfaceTool::build_meshlet_func = nullptr;
 }

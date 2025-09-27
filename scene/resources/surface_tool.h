@@ -185,7 +185,8 @@ private:
 			const tbool bIsOrientationPreserving, const int iFace, const int iVert);
 
 	void _add_triangle_fan(const Vector<Vector3> &p_vertices, const Vector<Vector2> &p_uvs = Vector<Vector2>(), const Vector<Color> &p_colors = Vector<Color>(), const Vector<Vector2> &p_uv2s = Vector<Vector2>(), const Vector<Vector3> &p_normals = Vector<Vector3>(), const TypedArray<Plane> &p_tangents = TypedArray<Plane>());
-
+	static Vector<uint32_t> _repack_triangles(Vector<RenderingServer::Meshlet> *meshlets, Span<uint8_t> meshlet_triangles);
+	
 protected:
 	static void _bind_methods();
 
@@ -243,7 +244,7 @@ public:
 	void append_from(const Ref<Mesh> &p_existing, int p_surface, const Transform3D &p_xform);
 	Ref<ArrayMesh> commit(const Ref<ArrayMesh> &p_existing = Ref<ArrayMesh>(), uint64_t p_compress_flags = 0);
 
-	void create_meshlets_from_surface_data(Vector<RS::Meshlet>* p_meshlets, Vector<uint32_t>* p_meshlet_vertices, Vector<uint32_t>* p_meshlet_triangles ,const RS::SurfaceData &p_surface_data, size_t max_vertices = 64, size_t max_triangles = 126);
+	static void create_meshlets_from_mesh(Vector<RenderingServer::Meshlet> *p_meshlets, Vector<uint32_t> *p_meshlet_vertices, Vector<uint32_t> *p_meshlet_triangles, const RenderingServer::SurfaceData& surface_data, size_t max_vertices = 64, size_t max_triangles = 124);
 	
 	SurfaceTool();
 };
