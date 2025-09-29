@@ -10,16 +10,22 @@ class RDHeaderStruct:
         self.vertex_lines = []
         self.fragment_lines = []
         self.compute_lines = []
+        self.mesh_lines = []
+        self.task_lines = []
 
         self.vertex_included_files = []
         self.fragment_included_files = []
         self.compute_included_files = []
+        self.mesh_included_files = []
+        self.task_included_files = []
 
         self.reading = ""
         self.line_offset = 0
         self.vertex_offset = 0
         self.fragment_offset = 0
         self.compute_offset = 0
+        self.mesh_offset = 0
+        self.task_offset = 0
 
 
 def include_file_in_rd_header(filename: str, header_data: RDHeaderStruct, depth: int) -> RDHeaderStruct:
@@ -50,6 +56,20 @@ def include_file_in_rd_header(filename: str, header_data: RDHeaderStruct, depth:
                 line = fs.readline()
                 header_data.line_offset += 1
                 header_data.compute_offset = header_data.line_offset
+                continue            
+            
+            if line.find("#[mesh]") != -1:        
+                header_data.reading = "mesh"
+                line = fs.readline()
+                header_data.line_offset += 1
+                header_data.mesh_offset = header_data.line_offset
+                continue
+                
+            if line.find("#[task]") != -1:        
+                header_data.reading = "task"
+                line = fs.readline()
+                header_data.line_offset += 1
+                header_data.task_offset = header_data.line_offset
                 continue
 
             while line.find("#include ") != -1:
@@ -73,6 +93,14 @@ def include_file_in_rd_header(filename: str, header_data: RDHeaderStruct, depth:
                     header_data.compute_included_files += [included_file]
                     if include_file_in_rd_header(included_file, header_data, depth + 1) is None:
                         print_error(f'In file "{filename}": #include "{includeline}" could not be found!"')
+                elif included_file not in header_data.mesh_included_files and header_data.reading == "mesh":
+                    header_data.mesh_included_files += [included_file]
+                    if include_file_in_rd_header(included_file, header_data, depth + 1) is None:
+                        print_error(f'In file "{filename}": #include "{includeline}" could not be found!"')
+                elif included_file not in header_data.task_included_files and header_data.reading == "task":
+                    header_data.task_included_files += [included_file]
+                    if include_file_in_rd_header(included_file, header_data, depth + 1) is None:
+                        print_error(f'In file "{filename}": #include "{includeline}" could not be found!"')
 
                 line = fs.readline()
 
@@ -84,6 +112,11 @@ def include_file_in_rd_header(filename: str, header_data: RDHeaderStruct, depth:
                 header_data.fragment_lines += [line]
             if header_data.reading == "compute":
                 header_data.compute_lines += [line]
+            if header_data.reading == "mesh":
+                header_data.mesh_lines += [line]
+            if header_data.reading == "task":
+                header_data.task_lines += [line]
+            
 
             line = fs.readline()
             header_data.line_offset += 1
