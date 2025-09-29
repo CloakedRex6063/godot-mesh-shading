@@ -402,7 +402,7 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 	{
 		if (new_surface.lods.size()) {
 			if (new_surface.index_count) {
-				Ref<SurfaceTool> st = memnew(SurfaceTool);
+				const Ref<SurfaceTool> st = memnew(SurfaceTool);
 				Vector<RS::Meshlet> meshlets;
 				Vector<uint32_t> meshlet_vertices;
 				Vector<uint32_t> meshlet_triangles;
