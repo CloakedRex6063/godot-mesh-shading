@@ -150,15 +150,28 @@ public:
 		static const char _vertex_code[] = {{
 {to_raw_cstring(header_data.vertex_lines)}
 		}};
+		static const char _mesh_code[] = {{
+{to_raw_cstring(header_data.mesh_lines)}
+		}};
+				static const char _task_code[] = {{
+{to_raw_cstring(header_data.task_lines)}
+		}};
 		static const char _fragment_code[] = {{
 {to_raw_cstring(header_data.fragment_lines)}
 		}};
 		static const char *_compute_code = nullptr;
 """)
 
-        file.write(f"""\
-		setup(_vertex_code, _fragment_code, _compute_code, "{class_name}");
-	}}
+        if header_data.mesh_lines:
+            file.write(f"""\
+		    setup(_mesh_code, _task_code, "{class_name}");
+	    }}
+}};
+""")
+        else:
+            file.write(f"""\
+		    setup(_vertex_code, _fragment_code, _compute_code, "{class_name}");
+	    }}
 }};
 """)
 
