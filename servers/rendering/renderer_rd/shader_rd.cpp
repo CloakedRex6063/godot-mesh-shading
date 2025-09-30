@@ -164,6 +164,31 @@ void ShaderRD::setup(const char *p_vertex_code, const char *p_fragment_code, con
 	base_sha256 = tohash.as_string().sha256_text();
 }
 
+void ShaderRD::setup(const char *p_mesh_code, const char *p_task_code, const char *p_name) {
+	name = p_name;
+
+	if (p_mesh_code) {
+		_add_stage(p_mesh_code, STAGE_TYPE_MESH);
+	}
+	if (p_task_code) {
+		_add_stage(p_task_code, STAGE_TYPE_TASK);
+	}
+
+	StringBuilder tohash;
+	tohash.append("[GodotVersionNumber]");
+	tohash.append(GODOT_VERSION_NUMBER);
+	tohash.append("[GodotVersionHash]");
+	tohash.append(GODOT_VERSION_HASH);
+	tohash.append("[Mesh]");
+	tohash.append(p_mesh_code ? p_mesh_code : "");
+	tohash.append("[Task]");
+	tohash.append(p_task_code ? p_task_code : "");
+	tohash.append("[DebugInfo]");
+	tohash.append(Engine::get_singleton()->is_generate_spirv_debug_info_enabled() ? "1" : "0");
+
+	base_sha256 = tohash.as_string().sha256_text();
+}
+
 RID ShaderRD::version_create(bool p_embedded) {
 	//initialize() was never called
 	ERR_FAIL_COND_V(group_to_variant_map.is_empty(), RID());

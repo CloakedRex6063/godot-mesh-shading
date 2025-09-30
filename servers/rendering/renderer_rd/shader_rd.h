@@ -148,6 +148,8 @@ private:
 		STAGE_TYPE_VERTEX,
 		STAGE_TYPE_FRAGMENT,
 		STAGE_TYPE_COMPUTE,
+		STAGE_TYPE_MESH,
+		STAGE_TYPE_TASK,
 		STAGE_TYPE_MAX,
 	};
 
@@ -168,6 +170,7 @@ private:
 protected:
 	ShaderRD();
 	void setup(const char *p_vertex_code, const char *p_fragment_code, const char *p_compute_code, const char *p_name);
+	void setup(const char *p_mesh_code, const char *p_task_code, const char *p_name);
 
 public:
 	RID version_create(bool p_embedded = true);
