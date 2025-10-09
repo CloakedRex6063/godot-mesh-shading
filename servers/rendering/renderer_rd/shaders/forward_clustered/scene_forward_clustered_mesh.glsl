@@ -1,4 +1,4 @@
-#[mesh]
+#[vertex]
 
 #version 450
 
@@ -13,16 +13,7 @@
 #define SHADER_SPACE_FAR 0.0
 
 /* INPUT ATTRIBS */
-
-// Always contains vertex position in XYZ, can contain tangent angle in W.
-layout(location = 0) in vec4 vertex_angle_attrib;
-
-//only for pure render depth when normal is not used
-
-#if defined(NORMAL_USED) || defined(TANGENT_USED)
-// Contains Normal/Axis in RG, can contain tangent in BA.
-layout(location = 1) in vec4 axis_tangent_attrib;
-#endif
+		
 
 // Location 2 is unused.
 
@@ -36,22 +27,6 @@ layout(location = 4) in vec2 uv_attrib;
 
 #if defined(UV2_USED) || defined(USE_LIGHTMAP) || defined(MODE_RENDER_MATERIAL)
 layout(location = 5) in vec2 uv2_attrib;
-#endif
-
-#if defined(CUSTOM0_USED)
-layout(location = 6) in vec4 custom0_attrib;
-#endif
-
-#if defined(CUSTOM1_USED)
-layout(location = 7) in vec4 custom1_attrib;
-#endif
-
-#if defined(CUSTOM2_USED)
-layout(location = 8) in vec4 custom2_attrib;
-#endif
-
-#if defined(CUSTOM3_USED)
-layout(location = 9) in vec4 custom3_attrib;
 #endif
 
 #if defined(BONES_USED) || defined(USE_PARTICLE_TRAILS)
@@ -76,6 +51,27 @@ vec3 oct_to_vec3(vec2 e) {
 	float t = max(-v.z, 0.0);
 	v.xy += t * -sign(v.xy);
 	return normalize(v);
+}
+
+vec2 uint_to_vec2(uint base) {
+	uvec2 decode = (uvec2(base) >> uvec2(0, 16)) & uvec2(0xFFFF, 0xFFFF);
+	return vec2(decode) / vec2(65535.0, 65535.0) * 2.0 - 1.0;
+}
+
+uint vec2_to_uint(vec2 base) {
+	uvec2 enc = uvec2(clamp(ivec2(base * vec2(65535, 65535)), ivec2(0), ivec2(0xFFFF, 0xFFFF))) << uvec2(0, 16);
+	return enc.x | enc.y;
+}
+
+vec3 decode_uint_oct_to_norm(uint base) {
+	return oct_to_vec3(uint_to_vec2(base));
+}
+
+vec4 decode_uint_oct_to_tang(uint base) {
+	vec2 oct_sign_encoded = uint_to_vec2(base);
+	// Binormal sign encoded in y component
+	vec2 oct = vec2(oct_sign_encoded.x, abs(oct_sign_encoded.y) * 2.0 - 1.0);
+	return vec4(oct_to_vec3(oct), sign(oct_sign_encoded.y));
 }
 
 void axis_angle_to_tbn(vec3 axis, float angle, out vec3 tangent, out vec3 binormal, out vec3 normal) {
@@ -786,19 +782,30 @@ void main() {
 	vec3 binormal;
 #endif
 
-	_unpack_vertex_attributes(
-			vertex_angle_attrib,
-			instances.data[instance_index].compressed_aabb_position_pad.xyz,
-			instances.data[instance_index].compressed_aabb_size_pad.xyz,
-#if defined(NORMAL_USED) || defined(TANGENT_USED)
-			axis_tangent_attrib,
+	uint src_offset = gl_VertexIndex * draw_call.vertex_stride;
+	vertex = uintBitsToFloat(uvec3(
+		draw_call.vertex_buffer.vertices[src_offset + 0],
+		draw_call.vertex_buffer.vertices[src_offset + 1],
+		draw_call.vertex_buffer.vertices[src_offset + 2]
+	));
+	vertex = vertex * instances.data[instance_index].compressed_aabb_size_pad.xyz + instances.data[instance_index].compressed_aabb_position_pad.xyz;
+		
 #ifdef NORMAL_USED
-			normal,
+	uint src_normal = draw_call.vertex_count * draw_call.vertex_stride + gl_VertexIndex * draw_call.normal_tangent_stride;
+
+	if (draw_call.normal_tangent_stride > 0) {
+		normal = decode_uint_oct_to_norm(draw_call.vertex_buffer.vertices[src_normal]);
+		src_normal++;
+	}
 #endif
-			tangent,
-			binormal,
+		
+#ifdef TANGENT_USED
+	if (draw_call.normal_tangent_stride == 2) {
+		vec4 decoded = decode_uint_oct_to_tang(draw_call.vertex_buffer.vertices[src_normal]);
+		tangent = decoded.xyz;
+		binormal = cross(normal, tangent) * decoded.w;
+	}
 #endif
-			vertex);
 
 	// Current vertex.
 	global_time = scene_data_block.data.time;

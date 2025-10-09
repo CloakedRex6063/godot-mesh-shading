@@ -794,16 +794,17 @@ public:
 	enum StorageBufferUsage {
 		STORAGE_BUFFER_USAGE_DISPATCH_INDIRECT = (1 << 0),
 	};
-
+	
 	RID vertex_buffer_create(uint32_t p_size_bytes, Span<uint8_t> p_data = {}, BitField<BufferCreationBits> p_creation_bits = 0);
 	RID _vertex_buffer_create(uint32_t p_size_bytes, const Vector<uint8_t> &p_data, BitField<BufferCreationBits> p_creation_bits = 0) {
 		return vertex_buffer_create(p_size_bytes, p_data, p_creation_bits);
 	}
-
+	
 	// This ID is warranted to be unique for the same formats, does not need to be freed
 	VertexFormatID vertex_format_create(const Vector<VertexAttribute> &p_vertex_descriptions);
 	RID vertex_array_create(uint32_t p_vertex_count, VertexFormatID p_vertex_format, const Vector<RID> &p_src_buffers, const Vector<uint64_t> &p_offsets = Vector<uint64_t>());
 
+	void index_array_get_buffer_and_offset(RID p_index_array, RID *p_buffer, uint32_t *p_offset);
 	RID index_buffer_create(uint32_t p_index_count, IndexBufferFormat p_format, Span<uint8_t> p_data = {}, bool p_use_restart_indices = false, BitField<BufferCreationBits> p_creation_bits = 0);
 	RID _index_buffer_create(uint32_t p_index_count, IndexBufferFormat p_format, const Vector<uint8_t> &p_data, bool p_use_restart_indices = false, BitField<BufferCreationBits> p_creation_bits = 0) {
 		return index_buffer_create(p_index_count, p_format, p_data, p_use_restart_indices, p_creation_bits);

@@ -7,6 +7,7 @@
 
 #extension GL_KHR_shader_subgroup_ballot : enable
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_EXT_buffer_reference : require
 
 #include "../cluster_data_inc.glsl"
 #include "../decal_data_inc.glsl"
@@ -22,7 +23,32 @@
 #define TANGENT_USED
 #endif
 
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer VertexBuffer
+{
+	uint vertices[];
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer IndexBuffer
+{
+	uint indices[];
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer AttribBuffer
+{
+	uint attribs[];
+};
+
 layout(push_constant, std430) uniform DrawCall {
+	VertexBuffer vertex_buffer;
+	IndexBuffer index_buffer;
+	AttribBuffer attrib_buffer;
+	uvec2 padding2;
+	
+	uint vertex_count;
+	uint vertex_stride;
+	uint normal_tangent_stride;
+	uint packed_attrib;
+	
 	uint instance_index;
 	uint uv_offset;
 	uint multimesh_motion_vectors_current_offset;
@@ -35,6 +61,21 @@ layout(push_constant, std430) uniform DrawCall {
 #endif
 }
 draw_call;
+
+bool has_color()
+{
+	return bool(draw_call.packed_attrib & 1u);
+}
+
+bool has_uv()
+{
+	return bool(draw_call.packed_attrib & 2u);
+}
+
+bool has_uv2()
+{
+	return bool(draw_call.packed_attrib & 4u);
+}
 
 /* Specialization Constants */
 

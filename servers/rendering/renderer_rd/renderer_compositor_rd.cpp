@@ -32,6 +32,7 @@
 
 #include "core/config/project_settings.h"
 #include "core/io/dir_access.h"
+#include "forward_clustered/render_forward_clustered_mesh.h"
 
 #include "servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.h"
 #include "servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h"
@@ -339,7 +340,7 @@ RendererCompositorRD::RendererCompositorRD() {
 		}
 		scene = memnew(RendererSceneRenderImplementation::RenderForwardMobile());
 	} else if (rendering_method == "forward_plus") {
-		scene = memnew(RendererSceneRenderImplementation::RenderForwardClustered());
+		scene = memnew(RendererSceneRenderImplementation::RenderForwardClusteredMesh());
 	} else {
 		// Fall back to our high end renderer.
 		ERR_PRINT(vformat("Cannot instantiate RenderingDevice-based renderer with renderer type '%s'. Defaulting to Forward+ renderer.", rendering_method));

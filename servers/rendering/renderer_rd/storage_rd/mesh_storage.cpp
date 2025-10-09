@@ -270,6 +270,9 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 		uint32_t stride = 0;
 		uint32_t attrib_stride = 0;
 		uint32_t skin_stride = 0;
+		uint32_t meshlet_stride = 0;
+		uint32_t meshlet_vertex_stride = 0;
+		uint32_t meshlet_triangle_stride = 0;
 
 		for (int i = 0; i < RS::ARRAY_WEIGHTS; i++) {
 			if ((p_surface.format & (1ULL << i))) {
@@ -310,16 +313,21 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 						}
 
 					} break;
-					case RS::ARRAY_MESHLET:
-					case RS::ARRAY_MESHLET_VERTEX:
-					case RS::ARRAY_MESHLET_TRIANGLE:
 					case RS::ARRAY_CUSTOM0: {
 						int idx = i - RS::ARRAY_CUSTOM0;
 						const uint32_t fmt_shift[RS::ARRAY_CUSTOM_COUNT] = { RS::ARRAY_FORMAT_CUSTOM0_SHIFT };
 						uint32_t fmt = (p_surface.format >> fmt_shift[idx]) & RS::ARRAY_FORMAT_CUSTOM_MASK;
 						const uint32_t fmtsize[RS::ARRAY_CUSTOM_MAX] = { 4, 4, 4, 8, 4, 8, 12, 16 };
 						attrib_stride += fmtsize[fmt];
-
+					} break;
+					case RS::ARRAY_MESHLET: {
+						meshlet_stride += sizeof(RS::Meshlet);
+					} break;
+					case RS::ARRAY_MESHLET_VERTEX: {
+						meshlet_vertex_stride += sizeof(uint32_t);
+					} break;
+					case RS::ARRAY_MESHLET_TRIANGLE: {
+						meshlet_triangle_stride += sizeof(uint32_t);
 					} break;
 					case RS::ARRAY_WEIGHTS:
 					case RS::ARRAY_BONES: {
@@ -341,6 +349,16 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 		int expected_attrib_size = attrib_stride * p_surface.vertex_count;
 		ERR_FAIL_COND_MSG(expected_attrib_size != p_surface.attribute_data.size(), "Size of attribute data provided (" + itos(p_surface.attribute_data.size()) + ") does not match expected (" + itos(expected_attrib_size) + ")");
 
+		int expected_meshlet_size = meshlet_stride * p_surface.meshlet_count;
+		ERR_FAIL_COND_MSG(expected_meshlet_size != p_surface.meshlet_data.size(), "Size of meshlet data provided (" + itos(p_surface.meshlet_data.size()) + ") does not match expected (" + itos(expected_meshlet_size) + ")");
+
+		int expected_meshlet_vertex_size = meshlet_vertex_stride * p_surface.meshlet_vertex_count;
+		ERR_FAIL_COND_MSG(expected_meshlet_vertex_size != p_surface.meshlet_vertex_data.size(), "Size of meshlet vertex data provided (" + itos(p_surface.meshlet_vertex_data.size()) + ") does not match expected (" + itos(expected_meshlet_vertex_size) + ")");
+
+		int expected_meshlet_triangle_size = meshlet_triangle_stride * p_surface.meshlet_triangle_count;
+		ERR_FAIL_COND_MSG(expected_meshlet_triangle_size != p_surface.meshlet_triangle_data.size(), "Size of meshlet triangle data provided (" + itos(p_surface.meshlet_triangle_data.size()) + ") does not match expected (" + itos(expected_meshlet_triangle_size) + ")");
+		
+		
 		if ((p_surface.format & RS::ARRAY_FORMAT_WEIGHTS) && (p_surface.format & RS::ARRAY_FORMAT_BONES)) {
 			expected_size = skin_stride * p_surface.vertex_count;
 			ERR_FAIL_COND_MSG(expected_size != p_surface.skin_data.size(), "Size of skin data provided (" + itos(p_surface.skin_data.size()) + ") does not match expected (" + itos(expected_size) + ")");
@@ -371,10 +389,8 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 
 	s->format = new_surface.format;
 	s->primitive = new_surface.primitive;
-
-	const bool use_as_storage = (new_surface.skin_data.size() || mesh->blend_shape_count > 0);
-	const BitField<RD::BufferCreationBits> as_storage_flag = use_as_storage ? RD::BUFFER_CREATION_AS_STORAGE_BIT : 0;
-
+	
+	constexpr uint32_t flags = RD::BUFFER_CREATION_AS_STORAGE_BIT | RD::BUFFER_CREATION_DEVICE_ADDRESS_BIT;
 	if (new_surface.vertex_data.size()) {
 		// If we have an uncompressed surface that contains normals, but not tangents, we need to differentiate the array
 		// from a compressed array in the shader. To do so, we allow the normal to read 4 components out of the buffer
@@ -387,10 +403,10 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 			Vector<uint8_t> new_vertex_data;
 			new_vertex_data.resize_initialized(new_surface.vertex_data.size() + sizeof(uint16_t) * 2);
 			memcpy(new_vertex_data.ptrw(), new_surface.vertex_data.ptr(), new_surface.vertex_data.size());
-			s->vertex_buffer = RD::get_singleton()->vertex_buffer_create(new_vertex_data.size(), new_vertex_data, as_storage_flag);
+			s->vertex_buffer = RD::get_singleton()->vertex_buffer_create(new_vertex_data.size(), new_vertex_data, flags);
 			s->vertex_buffer_size = new_vertex_data.size();
 		} else {
-			s->vertex_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.vertex_data.size(), new_surface.vertex_data, as_storage_flag);
+			s->vertex_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.vertex_data.size(), new_surface.vertex_data, flags);
 			s->vertex_buffer_size = new_surface.vertex_data.size();
 		}
 	}
@@ -425,17 +441,18 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 				s->meshlet_vertex_buffer_size = new_surface.meshlet_vertex_data.size();
 
 				//TODO: meshlet triangle buffer
+				
 			}
 			
 		}
 	}
 
 	if (new_surface.attribute_data.size()) {
-		s->attribute_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.attribute_data.size(), new_surface.attribute_data);
+		s->attribute_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.attribute_data.size(), new_surface.attribute_data, flags);
 		s->attribute_buffer_size = new_surface.attribute_data.size();
 	}
 	if (new_surface.skin_data.size()) {
-		s->skin_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.skin_data.size(), new_surface.skin_data, as_storage_flag);
+		s->skin_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.skin_data.size(), new_surface.skin_data, flags);
 		s->skin_buffer_size = new_surface.skin_data.size();
 	}
 
@@ -448,7 +465,7 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 	if (new_surface.index_count) {
 		bool is_index_16 = new_surface.vertex_count <= 65536 && new_surface.vertex_count > 0;
 
-		s->index_buffer = RD::get_singleton()->index_buffer_create(new_surface.index_count, is_index_16 ? RD::INDEX_BUFFER_FORMAT_UINT16 : RD::INDEX_BUFFER_FORMAT_UINT32, new_surface.index_data, false);
+		s->index_buffer = RD::get_singleton()->index_buffer_create(new_surface.index_count, is_index_16 ? RD::INDEX_BUFFER_FORMAT_UINT16 : RD::INDEX_BUFFER_FORMAT_UINT32, new_surface.index_data, false, flags);
 		s->index_buffer_size = new_surface.index_data.size();
 		s->index_count = new_surface.index_count;
 		s->index_array = RD::get_singleton()->index_array_create(s->index_buffer, 0, s->index_count);
@@ -458,7 +475,7 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 
 			for (int i = 0; i < new_surface.lods.size(); i++) {
 				uint32_t indices = new_surface.lods[i].index_data.size() / (is_index_16 ? 2 : 4);
-				s->lods[i].index_buffer = RD::get_singleton()->index_buffer_create(indices, is_index_16 ? RD::INDEX_BUFFER_FORMAT_UINT16 : RD::INDEX_BUFFER_FORMAT_UINT32, new_surface.lods[i].index_data);
+				s->lods[i].index_buffer = RD::get_singleton()->index_buffer_create(indices, is_index_16 ? RD::INDEX_BUFFER_FORMAT_UINT16 : RD::INDEX_BUFFER_FORMAT_UINT32, new_surface.lods[i].index_data, false, flags);
 				s->lods[i].index_buffer_size = new_surface.lods[i].index_data.size();
 				s->lods[i].index_array = RD::get_singleton()->index_array_create(s->lods[i].index_buffer, 0, indices);
 				s->lods[i].edge_length = new_surface.lods[i].edge_length;
@@ -480,7 +497,7 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 		s->blend_shape_buffer_size = new_surface.blend_shape_data.size();
 	}
 
-	if (use_as_storage) {
+	if (s->skin_buffer_size) {
 		Vector<RD::Uniform> uniforms;
 		{
 			RD::Uniform u;
@@ -1103,7 +1120,7 @@ void MeshStorage::_mesh_instance_add_surface(MeshInstance *mi, Mesh *mesh, uint3
 }
 
 void MeshStorage::_mesh_instance_add_surface_buffer(MeshInstance *mi, Mesh *mesh, MeshInstance::Surface *s, uint32_t p_surface, uint32_t p_buffer_index) {
-	s->vertex_buffer[p_buffer_index] = RD::get_singleton()->vertex_buffer_create(mesh->surfaces[p_surface]->vertex_buffer_size, Vector<uint8_t>(), RD::BUFFER_CREATION_AS_STORAGE_BIT);
+	s->vertex_buffer[p_buffer_index] = RD::get_singleton()->vertex_buffer_create(mesh->surfaces[p_surface]->vertex_buffer_size, Vector<uint8_t>(), RD::BUFFER_CREATION_AS_STORAGE_BIT | RD::BUFFER_CREATION_DEVICE_ADDRESS_BIT);
 
 	Vector<RD::Uniform> uniforms;
 	{
@@ -1521,11 +1538,17 @@ void MeshStorage::_mesh_surface_generate_version_for_input_mask(Mesh::Surface::V
 				case RS::ARRAY_COLOR:
 				case RS::ARRAY_TEX_UV:
 				case RS::ARRAY_TEX_UV2:
-				case RS::ARRAY_MESHLET:
-				case RS::ARRAY_MESHLET_VERTEX:
-				case RS::ARRAY_MESHLET_TRIANGLE:
 				case RS::ARRAY_CUSTOM0:
 					buffer = s->attribute_buffer;
+					break;
+				case RS::ARRAY_MESHLET:
+					buffer = s->meshlet_buffer;
+					break;
+				case RS::ARRAY_MESHLET_VERTEX:
+					buffer = s->meshlet_vertex_buffer;
+					break;
+				case RS::ARRAY_MESHLET_TRIANGLE:
+					buffer = s->meshlet_triangle_buffer;
 					break;
 				case RS::ARRAY_BONES:
 				case RS::ARRAY_WEIGHTS:

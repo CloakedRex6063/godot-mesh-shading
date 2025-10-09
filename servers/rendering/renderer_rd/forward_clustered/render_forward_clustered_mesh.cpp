@@ -580,13 +580,41 @@ void RenderForwardClusteredMesh::_render_list_template(RenderingDevice::DrawList
 				push_constant.multimesh_motion_vectors_previous_offset = 0;
 			}
 
+			if (vertex_array_rd.is_valid()) {
+				RID vertex_buffer = mesh_storage->get_singleton()->mesh_surface_get_vertex_buffer(mesh_surface);
+				push_constant.mesh_shader.vertex_buffer = RD::get_singleton()->buffer_get_device_address(vertex_buffer);
+				push_constant.mesh_shader.vertex_count = mesh_storage->get_singleton()->mesh_surface_get_vertex_count(mesh_surface);
+				push_constant.mesh_shader.normal_tangent_stride = mesh_storage->get_singleton()->mesh_surface_get_normal_tangent_stride(mesh_surface);
+				push_constant.mesh_shader.vertex_stride = mesh_storage->get_singleton()->mesh_surface_get_vertex_stride(mesh_surface);
+				bool has_color = mesh_storage->get_singleton()->mesh_surface_has_color(mesh_surface);
+				bool has_uv = mesh_storage->get_singleton()->mesh_surface_has_uv(mesh_surface);
+				bool has_uv2 = mesh_storage->get_singleton()->mesh_surface_has_uv2(mesh_surface);
+				push_constant.mesh_shader.packed_attrib = (has_color << 0) | (has_uv << 1) | (has_uv2 << 2);
+			}
+			else {
+				push_constant.mesh_shader.vertex_buffer = 0;
+			}
+			if (index_array_rd.is_valid()) {
+				RID index_buffer = mesh_storage->get_singleton()->mesh_surface_get_index_buffer(mesh_surface);
+				push_constant.mesh_shader.index_buffer = RD::get_singleton()->buffer_get_device_address(index_buffer);
+			}
+			else {
+				push_constant.mesh_shader.index_buffer = 0;
+			}
+
+			RID attrib_buffer = mesh_storage->get_singleton()->mesh_surface_get_attrib_buffer(mesh_surface);
+			if (attrib_buffer.is_valid()) {
+				push_constant.mesh_shader.attrib_buffer = RD::get_singleton()->buffer_get_device_address(attrib_buffer);
+			}
+
 			size_t push_constant_size = 0;
 			if (pipeline_key.ubershader) {
 				push_constant_size = sizeof(SceneState::PushConstant);
 				push_constant.ubershader.specialization = pipeline_specialization;
 				push_constant.ubershader.constants = {};
 				push_constant.ubershader.constants.cull_mode = cull_mode;
-			} else {
+			}
+			else {
 				push_constant_size = sizeof(SceneState::PushConstant) - sizeof(SceneState::PushConstantUbershader);
 			}
 
@@ -596,7 +624,7 @@ void RenderForwardClusteredMesh::_render_list_template(RenderingDevice::DrawList
 			if (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_USES_PARTICLE_TRAILS) {
 				instance_count /= surf->owner->trail_steps;
 			}
-
+			
 			if (bool(surf->owner->base_flags & INSTANCE_DATA_FLAG_MULTIMESH_INDIRECT)) {
 				RD::get_singleton()->draw_list_draw_indirect(draw_list, index_array_rd.is_valid(), mesh_storage->_multimesh_get_command_buffer_rd_rid(surf->owner->data->base), surf->surface_index * sizeof(uint32_t) * mesh_storage->INDIRECT_MULTIMESH_COMMAND_STRIDE, 1, 0);
 			} else {
