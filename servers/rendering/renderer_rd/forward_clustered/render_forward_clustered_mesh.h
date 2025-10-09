@@ -314,7 +314,19 @@ private:
 			SceneShaderForwardClusteredMesh::UbershaderConstants constants;
 		};
 
+		struct PushConstantMeshShader {
+			uint64_t vertex_buffer;
+			uint64_t index_buffer;
+			uint64_t attrib_buffer;
+			uint64_t padding2;
+			uint32_t vertex_count;
+			uint32_t vertex_stride;
+			uint32_t normal_tangent_stride;
+			uint32_t packed_attrib; // Has color, uv, uv2
+		};
+		
 		struct PushConstant {
+			PushConstantMeshShader mesh_shader;
 			uint32_t base_index; //
 			uint32_t uv_offset; //packed
 			uint32_t multimesh_motion_vectors_current_offset;

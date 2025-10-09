@@ -91,6 +91,9 @@ private:
 			RID meshlet_vertex_buffer;
 			uint32_t meshlet_vertex_buffer_size = 0;
 
+			RID meshlet_triangle_buffer;
+			uint32_t meshlet_triangle_buffer_size = 0;
+			
 			RID skin_buffer;
 			uint32_t skin_buffer_size = 0;
 
@@ -461,6 +464,51 @@ public:
 		return s->index_count ? s->index_count : s->vertex_count;
 	}
 
+	_FORCE_INLINE_ uint32_t mesh_surface_get_index_count(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->index_count;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_vertex_count(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->vertex_count;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_has_normal(void* surface) {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(surface);
+		return s->format & RS::ARRAY_FORMAT_NORMAL;;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_has_tangent(void* surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(surface);
+		return s->format & RS::ARRAY_FORMAT_TANGENT;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_has_color(void* surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(surface);
+		return s->format & RS::ARRAY_FORMAT_COLOR;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_has_uv(void* surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(surface);
+		return s->format & RS::ARRAY_FORMAT_TEX_UV;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_has_uv2(void* surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(surface);
+		return s->format & RS::ARRAY_FORMAT_TEX_UV2;
+	}
+	
+	_FORCE_INLINE_ uint32_t mesh_surface_get_vertex_stride(void* p_surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(p_surface);
+		const uint32_t normal_tangent_stride = mesh_surface_get_normal_tangent_stride(p_surface);
+		return ((s->vertex_buffer_size / s->vertex_count) / 4) - normal_tangent_stride;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_normal_tangent_stride(void* p_surface) {
+		return (mesh_surface_has_normal(p_surface) ? 1 : 0) + (mesh_surface_has_tangent(p_surface) ? 1 : 0);
+	}
+
 	_FORCE_INLINE_ AABB mesh_surface_get_aabb(void *p_surface) {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 		return s->aabb;
@@ -506,6 +554,21 @@ public:
 		}
 	}
 
+	_FORCE_INLINE_ RID mesh_surface_get_index_buffer(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->index_buffer;
+	}
+
+	_FORCE_INLINE_ RID mesh_surface_get_vertex_buffer(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->vertex_buffer;
+	}
+
+	_FORCE_INLINE_ RID mesh_surface_get_attrib_buffer(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->attribute_buffer;
+	}
+	
 	_FORCE_INLINE_ void mesh_surface_get_vertex_arrays_and_format(void *p_surface, uint64_t p_input_mask, bool p_input_motion_vectors, RID &r_vertex_array_rd, RD::VertexFormatID &r_vertex_format) {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 

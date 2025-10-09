@@ -101,7 +101,7 @@ public:
 		union {
 			uint32_t packed_0;
 
-			struct {
+			struct {	
 				uint32_t use_forward_gi : 1;
 				uint32_t use_light_projector : 1;
 				uint32_t use_light_soft_shadows : 1;
@@ -336,7 +336,7 @@ public:
 
 	RendererRD::MaterialStorage::MaterialData *_create_material_func(ShaderData *p_shader);
 	static RendererRD::MaterialStorage::MaterialData *_create_material_funcs(RendererRD::MaterialStorage::ShaderData *p_shader) {
-		return static_cast<SceneShaderForwardClusteredMesh *>(singleton)->_create_material_func(static_cast<ShaderData *>(p_shader));
+		return singleton->_create_material_func(static_cast<ShaderData *>(p_shader));
 	}
 
 	SceneForwardClusteredMeshShaderRD shader;
