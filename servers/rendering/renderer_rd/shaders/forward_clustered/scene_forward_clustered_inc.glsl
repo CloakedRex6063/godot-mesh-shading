@@ -42,7 +42,7 @@ layout(push_constant, std430) uniform DrawCall {
 	VertexBuffer vertex_buffer;
 	IndexBuffer index_buffer;
 	AttribBuffer attrib_buffer;
-	uvec2 padding2;
+	uvec2 padding;
 	
 	uint vertex_count;
 	uint vertex_stride;
@@ -62,19 +62,19 @@ layout(push_constant, std430) uniform DrawCall {
 }
 draw_call;
 
-bool has_color()
+uint color_stride()
 {
-	return bool(draw_call.packed_attrib & 1u);
+	return draw_call.packed_attrib & 0xFu;
 }
 
-bool has_uv()
+uint uv_stride()
 {
-	return bool(draw_call.packed_attrib & 2u);
+	return ((draw_call.packed_attrib >> 4u)) & 0xFu;
 }
 
-bool has_uv2()
+uint uv2_stride()
 {
-	return bool(draw_call.packed_attrib & 4u);
+	return ((draw_call.packed_attrib >> 8u)) & 0xFu;
 }
 
 /* Specialization Constants */

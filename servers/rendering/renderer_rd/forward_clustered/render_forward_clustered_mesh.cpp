@@ -325,7 +325,7 @@ void RenderForwardClusteredMesh::_render_list_template(RenderingDevice::DrawList
 
 	bool shadow_pass = (p_pass_mode == PASS_MODE_SHADOW) || (p_pass_mode == PASS_MODE_SHADOW_DP);
 
-	SceneState::PushConstant push_constant;
+	SceneState::PushConstant push_constant{};
 
 	if constexpr (p_pass_mode == PASS_MODE_DEPTH_MATERIAL) {
 		push_constant.uv_offset = Math::make_half_float(p_params->uv_offset.y) << 16;
@@ -586,25 +586,20 @@ void RenderForwardClusteredMesh::_render_list_template(RenderingDevice::DrawList
 				push_constant.mesh_shader.vertex_count = mesh_storage->get_singleton()->mesh_surface_get_vertex_count(mesh_surface);
 				push_constant.mesh_shader.normal_tangent_stride = mesh_storage->get_singleton()->mesh_surface_get_normal_tangent_stride(mesh_surface);
 				push_constant.mesh_shader.vertex_stride = mesh_storage->get_singleton()->mesh_surface_get_vertex_stride(mesh_surface);
-				bool has_color = mesh_storage->get_singleton()->mesh_surface_has_color(mesh_surface);
-				bool has_uv = mesh_storage->get_singleton()->mesh_surface_has_uv(mesh_surface);
-				bool has_uv2 = mesh_storage->get_singleton()->mesh_surface_has_uv2(mesh_surface);
-				push_constant.mesh_shader.packed_attrib = (has_color << 0) | (has_uv << 1) | (has_uv2 << 2);
 			}
-			else {
-				push_constant.mesh_shader.vertex_buffer = 0;
-			}
+
 			if (index_array_rd.is_valid()) {
 				RID index_buffer = mesh_storage->get_singleton()->mesh_surface_get_index_buffer(mesh_surface);
 				push_constant.mesh_shader.index_buffer = RD::get_singleton()->buffer_get_device_address(index_buffer);
-			}
-			else {
-				push_constant.mesh_shader.index_buffer = 0;
 			}
 
 			RID attrib_buffer = mesh_storage->get_singleton()->mesh_surface_get_attrib_buffer(mesh_surface);
 			if (attrib_buffer.is_valid()) {
 				push_constant.mesh_shader.attrib_buffer = RD::get_singleton()->buffer_get_device_address(attrib_buffer);
+				uint32_t color_stride = mesh_storage->get_singleton()->mesh_surface_get_color_stride(mesh_surface);
+				uint32_t uv_stride = mesh_storage->get_singleton()->mesh_surface_get_uv_stride(mesh_surface);
+				uint32_t uv2_stride = mesh_storage->get_singleton()->mesh_surface_get_uv2_stride(mesh_surface);
+				push_constant.mesh_shader.packed_attrib = (color_stride & 0xF) | ((uv_stride & 0xF) << 4) | ((uv2_stride & 0xF) << 8);
 			}
 
 			size_t push_constant_size = 0;

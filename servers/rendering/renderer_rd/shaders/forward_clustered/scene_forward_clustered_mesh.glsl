@@ -13,21 +13,6 @@
 #define SHADER_SPACE_FAR 0.0
 
 /* INPUT ATTRIBS */
-		
-
-// Location 2 is unused.
-
-#if defined(COLOR_USED)
-layout(location = 3) in vec4 color_attrib;
-#endif
-
-#ifdef UV_USED
-layout(location = 4) in vec2 uv_attrib;
-#endif
-
-#if defined(UV2_USED) || defined(USE_LIGHTMAP) || defined(MODE_RENDER_MATERIAL)
-layout(location = 5) in vec2 uv2_attrib;
-#endif
 
 #if defined(BONES_USED) || defined(USE_PARTICLE_TRAILS)
 layout(location = 10) in uvec4 bone_attrib;
@@ -222,8 +207,17 @@ void vertex_shader(vec3 vertex_input,
 #endif
 		in uint instance_index, in uint multimesh_offset, in SceneData scene_data, in mat4 model_matrix, out vec4 screen_pos) {
 	vec4 instance_custom = vec4(0.0);
+			
+	uint attrib_offset = 0;
 #if defined(COLOR_USED)
-	color_interp = color_attrib;
+	color_interp = vec4(1);	
+    uint stride = color_stride();
+	if(stride > 0)
+	{
+		uint packed_color = draw_call.attrib_buffer.attribs[gl_VertexIndex * stride];
+		color_interp = unpackUnorm4x8(packed_color);
+	}
+	attrib_offset = draw_call.vertex_count * color_stride();
 #endif
 
 	mat4 inv_view_matrix = scene_data.inv_view_matrix;
@@ -257,7 +251,6 @@ void vertex_shader(vec3 vertex_input,
 		uint stride = 3 + 1 + 1; //particles always uses this format
 
 		uint offset = trail_size * stride * gl_InstanceIndex;
-
 #ifdef COLOR_USED
 		vec4 pcolor;
 #endif
@@ -344,11 +337,29 @@ void vertex_shader(vec3 vertex_input,
 #endif
 
 #ifdef UV_USED
-	uv_interp = uv_attrib;
+	uint uv_stride = uv_stride();
+	if(uv_stride > 0)
+	{
+		uint packed_uv = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv_stride];
+		uint packed_uv2 = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv_stride + 1];
+		uv_interp = mix(unpackHalf2x16(packed_uv),
+		vec2(uintBitsToFloat(packed_uv), uintBitsToFloat(packed_uv2)),
+		float(uv_stride - 1));
+	}
+	attrib_offset = draw_call.vertex_count * uv_stride;
 #endif
 
 #if defined(UV2_USED) || defined(USE_LIGHTMAP)
-	uv2_interp = uv2_attrib;
+	uint uv2_stride = uv2_stride();
+	if(uv2_stride > 0)
+	{
+		uint packed_uv = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv2_stride];
+		uint packed_uv2 = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv2_stride + 1];
+		uv_interp = mix(unpackHalf2x16(packed_uv),
+		vec2(uintBitsToFloat(packed_uv), uintBitsToFloat(packed_uv2)),
+		float(uv2_stride - 1));
+	}
+	attrib_offset = draw_call.vertex_count * uv2_stride;
 #endif
 
 	vec4 uv_scale = instances.data[instance_index].uv_scale;

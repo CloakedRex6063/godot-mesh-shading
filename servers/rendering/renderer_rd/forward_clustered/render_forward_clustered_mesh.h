@@ -318,7 +318,7 @@ private:
 			uint64_t vertex_buffer;
 			uint64_t index_buffer;
 			uint64_t attrib_buffer;
-			uint64_t padding2;
+			uint64_t bone_buffer;
 			uint32_t vertex_count;
 			uint32_t vertex_stride;
 			uint32_t normal_tangent_stride;

@@ -509,6 +509,28 @@ public:
 		return (mesh_surface_has_normal(p_surface) ? 1 : 0) + (mesh_surface_has_tangent(p_surface) ? 1 : 0);
 	}
 
+	_FORCE_INLINE_ uint32_t mesh_surface_get_color_stride(void *p_surface) {
+		return (mesh_surface_has_color(p_surface) ? 1 : 0);
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_uv_stride(void *p_surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(p_surface);
+		if (!mesh_surface_has_uv(s)) return 0;
+		if (s->format & RS::ARRAY_FLAG_COMPRESS_ATTRIBUTES) {
+			return 1;
+		}
+		return 2;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_uv2_stride(void *p_surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(p_surface);
+		if (!mesh_surface_has_uv2(s)) return 0;
+		if (s->format & RS::ARRAY_FLAG_COMPRESS_ATTRIBUTES) {
+			return 1;
+		}
+		return 2;
+	}
+
 	_FORCE_INLINE_ AABB mesh_surface_get_aabb(void *p_surface) {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 		return s->aabb;
@@ -568,6 +590,12 @@ public:
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 		return s->attribute_buffer;
 	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_attrib_buffer_size(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->attribute_buffer_size;
+	}
+	
 	
 	_FORCE_INLINE_ void mesh_surface_get_vertex_arrays_and_format(void *p_surface, uint64_t p_input_mask, bool p_input_motion_vectors, RID &r_vertex_array_rd, RD::VertexFormatID &r_vertex_format) {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
