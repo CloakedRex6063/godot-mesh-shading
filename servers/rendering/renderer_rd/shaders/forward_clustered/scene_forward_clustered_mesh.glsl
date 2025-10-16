@@ -4,6 +4,8 @@
 
 #VERSION_DEFINES
 
+//#extension GL_EXT_mesh_shader : require
+		
 /* Include half precision types. */
 #include "../half_inc.glsl"
 
@@ -11,25 +13,6 @@
 
 #define SHADER_IS_SRGB false
 #define SHADER_SPACE_FAR 0.0
-
-/* INPUT ATTRIBS */
-
-#if defined(BONES_USED) || defined(USE_PARTICLE_TRAILS)
-layout(location = 10) in uvec4 bone_attrib;
-#endif
-
-#if defined(WEIGHTS_USED) || defined(USE_PARTICLE_TRAILS)
-layout(location = 11) in vec4 weight_attrib;
-#endif
-
-#ifdef MOTION_VECTORS
-layout(location = 12) in vec4 previous_vertex_attrib;
-
-#if defined(NORMAL_USED) || defined(TANGENT_USED)
-layout(location = 13) in vec4 previous_normal_attrib;
-#endif
-
-#endif // MOTION_VECTORS
 
 vec3 oct_to_vec3(vec2 e) {
 	vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
@@ -217,7 +200,7 @@ void vertex_shader(vec3 vertex_input,
 		uint packed_color = draw_call.attrib_buffer.attribs[gl_VertexIndex * stride];
 		color_interp = unpackUnorm4x8(packed_color);
 	}
-	attrib_offset = draw_call.vertex_count * color_stride();
+	attrib_offset = vertex_count() * color_stride();
 #endif
 
 	mat4 inv_view_matrix = scene_data.inv_view_matrix;
@@ -254,32 +237,42 @@ void vertex_shader(vec3 vertex_input,
 #ifdef COLOR_USED
 		vec4 pcolor;
 #endif
+		uint skin_offset = skin_stride() * gl_VertexIndex;
+		uvec2 bones = uvec2(draw_call.skin_buffer.skins[skin_offset + 0], draw_call.skin_buffer.skins[skin_offset + 1]);
+		vec2 bones_01 = unpackUnorm2x16(bones.x);
+		vec2 bones_23 = unpackUnorm2x16(bones.y);
+		
+		skin_offset += skin_weight_offset();
+		uvec2 weights = uvec2(draw_call.skin_buffer.skins[skin_offset + 0], draw_call.skin_buffer.skins[skin_offset + 1]);
+		vec2 weights_01 = unpackUnorm2x16(weights.x);
+		vec2 weights_23 = unpackUnorm2x16(weights.y);
+		
 		{
-			uint boffset = offset + bone_attrib.x * stride;
-			matrix = mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weight_attrib.x;
+			uint boffset = offset + bones_01.x * stride;
+			matrix = mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weights_01.x;
 #ifdef COLOR_USED
-			pcolor = transforms.data[boffset + 3] * weight_attrib.x;
+			pcolor = transforms.data[boffset + 3] * weights_01.x;
 #endif
 		}
-		if (weight_attrib.y > 0.001) {
-			uint boffset = offset + bone_attrib.y * stride;
-			matrix += mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weight_attrib.y;
+		if (weights_01.y > 0.001) {
+			uint boffset = offset + bones_01.y * stride;
+			matrix += mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weights_01.y;
 #ifdef COLOR_USED
-			pcolor += transforms.data[boffset + 3] * weight_attrib.y;
+			pcolor += transforms.data[boffset + 3] * weights_01.y;
 #endif
 		}
-		if (weight_attrib.z > 0.001) {
-			uint boffset = offset + bone_attrib.z * stride;
-			matrix += mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weight_attrib.z;
+		if (weights_23.x > 0.001) {
+			uint boffset = offset + bones_23.x * stride;
+			matrix += mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weights_23.x;
 #ifdef COLOR_USED
-			pcolor += transforms.data[boffset + 3] * weight_attrib.z;
+			pcolor += transforms.data[boffset + 3] * weights_23.x;
 #endif
 		}
-		if (weight_attrib.w > 0.001) {
-			uint boffset = offset + bone_attrib.w * stride;
-			matrix += mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weight_attrib.w;
+		if (weights_23.y > 0.001) {
+			uint boffset = offset + bones_23.y * stride;
+			matrix += mat4(transforms.data[boffset + 0], transforms.data[boffset + 1], transforms.data[boffset + 2], vec4(0.0, 0.0, 0.0, 1.0)) * weights_23.y;
 #ifdef COLOR_USED
-			pcolor += transforms.data[boffset + 3] * weight_attrib.w;
+			pcolor += transforms.data[boffset + 3] * weights_23.y;
 #endif
 		}
 
@@ -343,10 +336,10 @@ void vertex_shader(vec3 vertex_input,
 		uint packed_uv = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv_stride];
 		uint packed_uv2 = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv_stride + 1];
 		uv_interp = mix(unpackHalf2x16(packed_uv),
-		vec2(uintBitsToFloat(packed_uv), uintBitsToFloat(packed_uv2)),
-		float(uv_stride - 1));
+						vec2(uintBitsToFloat(packed_uv), uintBitsToFloat(packed_uv2)),
+						float(uv_stride - 1));
 	}
-	attrib_offset = draw_call.vertex_count * uv_stride;
+	attrib_offset = vertex_count() * uv_stride;
 #endif
 
 #if defined(UV2_USED) || defined(USE_LIGHTMAP)
@@ -355,11 +348,10 @@ void vertex_shader(vec3 vertex_input,
 	{
 		uint packed_uv = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv2_stride];
 		uint packed_uv2 = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv2_stride + 1];
-		uv_interp = mix(unpackHalf2x16(packed_uv),
-		vec2(uintBitsToFloat(packed_uv), uintBitsToFloat(packed_uv2)),
-		float(uv2_stride - 1));
+		uv2_interp = mix(unpackHalf2x16(packed_uv),
+		                 vec2(uintBitsToFloat(packed_uv), uintBitsToFloat(packed_uv2)),
+	                     float(uv2_stride - 1));
 	}
-	attrib_offset = draw_call.vertex_count * uv2_stride;
 #endif
 
 	vec4 uv_scale = instances.data[instance_index].uv_scale;
@@ -673,10 +665,18 @@ void vertex_shader(vec3 vertex_input,
 #ifdef MODE_RENDER_MATERIAL
 	if (bool(scene_data.flags & SCENE_DATA_FLAGS_USE_UV2_MATERIAL)) {
 		vec2 uv_dest_attrib;
+
+		uint uv2_stride = uv2_stride();
+		uint packed_uv = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv2_stride];
+		uint packed_uv2 = draw_call.attrib_buffer.attribs[gl_VertexIndex * uv2_stride + 1];
+		vec2 uv_default_attrib = mix(unpackHalf2x16(packed_uv),
+								vec2(uintBitsToFloat(packed_uv), uintBitsToFloat(packed_uv2)),
+								float(uv2_stride - 1));
+				
 		if (uv_scale != vec4(0.0)) {
-			uv_dest_attrib = (uv2_attrib.xy - 0.5) * uv_scale.zw;
+			uv_dest_attrib = (uv_default_attrib.xy - 0.5) * uv_scale.zw;
 		} else {
-			uv_dest_attrib = uv2_attrib.xy;
+			uv_dest_attrib = uv_default_attrib.xy;
 		}
 
 		vec2 uv_offset = unpackHalf2x16(draw_call.uv_offset);
@@ -733,6 +733,9 @@ void _unpack_vertex_attributes(vec4 p_vertex_in, vec3 p_compressed_aabb_position
 #endif
 }
 
+//layout(local_size_x = 128) in;
+//layout(triangles, max_vertices = 64, max_primitives = 128) out;
+		
 void main() {
 	uint instance_index = draw_call.instance_index;
 	if (!sc_multimesh()) {
@@ -753,21 +756,31 @@ void main() {
 	vec3 prev_tangent;
 	vec3 prev_binormal;
 #endif
+		
+	uint prev_src_offset = gl_VertexIndex * vertex_stride();
+	prev_vertex = uintBitsToFloat(uvec3(
+				draw_call.prev_vertex_buffer.vertices[prev_src_offset + 0],
+				draw_call.prev_vertex_buffer.vertices[prev_src_offset + 1],
+				draw_call.prev_vertex_buffer.vertices[prev_src_offset + 2]
+	));
+	prev_vertex = prev_vertex * instances.data[instance_index].compressed_aabb_size_pad.xyz + instances.data[instance_index].compressed_aabb_position_pad.xyz;
 
-	_unpack_vertex_attributes(
-			previous_vertex_attrib,
-			instances.data[instance_index].compressed_aabb_position_pad.xyz,
-			instances.data[instance_index].compressed_aabb_size_pad.xyz,
-
-#if defined(NORMAL_USED) || defined(TANGENT_USED)
-			previous_normal_attrib,
 #ifdef NORMAL_USED
-			prev_normal,
+	uint prev_src_normal = vertex_count() * vertex_stride() + gl_VertexIndex * normal_tangent_stride();
+
+	if (normal_tangent_stride() > 0) {
+		prev_normal = decode_uint_oct_to_norm(draw_call.prev_vertex_buffer.vertices[prev_src_normal]);
+		prev_src_normal++;
+	}
 #endif
-			prev_tangent,
-			prev_binormal,
+
+#ifdef TANGENT_USED
+	if (normal_tangent_stride() == 2) {
+		vec4 decoded = decode_uint_oct_to_tang(draw_call.prev_vertex_buffer.vertices[prev_src_normal]);
+		prev_tangent = decoded.xyz;
+		prev_binormal = cross(prev_normal, prev_tangent) * decoded.w;
+	}
 #endif
-			prev_vertex);
 
 	global_time = scene_data_block.prev_data.time;
 	vertex_shader(prev_vertex,
@@ -793,7 +806,7 @@ void main() {
 	vec3 binormal;
 #endif
 
-	uint src_offset = gl_VertexIndex * draw_call.vertex_stride;
+	uint src_offset = gl_VertexIndex * vertex_stride();
 	vertex = uintBitsToFloat(uvec3(
 		draw_call.vertex_buffer.vertices[src_offset + 0],
 		draw_call.vertex_buffer.vertices[src_offset + 1],
@@ -802,16 +815,16 @@ void main() {
 	vertex = vertex * instances.data[instance_index].compressed_aabb_size_pad.xyz + instances.data[instance_index].compressed_aabb_position_pad.xyz;
 		
 #ifdef NORMAL_USED
-	uint src_normal = draw_call.vertex_count * draw_call.vertex_stride + gl_VertexIndex * draw_call.normal_tangent_stride;
+	uint src_normal = vertex_count() * vertex_stride() + gl_VertexIndex * normal_tangent_stride();
 
-	if (draw_call.normal_tangent_stride > 0) {
+	if (normal_tangent_stride() > 0) {
 		normal = decode_uint_oct_to_norm(draw_call.vertex_buffer.vertices[src_normal]);
 		src_normal++;
 	}
 #endif
 		
 #ifdef TANGENT_USED
-	if (draw_call.normal_tangent_stride == 2) {
+	if (normal_tangent_stride() == 2) {
 		vec4 decoded = decode_uint_oct_to_tang(draw_call.vertex_buffer.vertices[src_normal]);
 		tangent = decoded.xyz;
 		binormal = cross(normal, tangent) * decoded.w;

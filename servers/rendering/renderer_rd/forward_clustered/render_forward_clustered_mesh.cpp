@@ -583,9 +583,8 @@ void RenderForwardClusteredMesh::_render_list_template(RenderingDevice::DrawList
 			if (vertex_array_rd.is_valid()) {
 				RID vertex_buffer = mesh_storage->get_singleton()->mesh_surface_get_vertex_buffer(mesh_surface);
 				push_constant.mesh_shader.vertex_buffer = RD::get_singleton()->buffer_get_device_address(vertex_buffer);
-				push_constant.mesh_shader.vertex_count = mesh_storage->get_singleton()->mesh_surface_get_vertex_count(mesh_surface);
-				push_constant.mesh_shader.normal_tangent_stride = mesh_storage->get_singleton()->mesh_surface_get_normal_tangent_stride(mesh_surface);
-				push_constant.mesh_shader.vertex_stride = mesh_storage->get_singleton()->mesh_surface_get_vertex_stride(mesh_surface);
+				uint32_t vertex_count = mesh_storage->get_singleton()->mesh_surface_get_vertex_count(mesh_surface);
+				push_constant.mesh_shader.vertex_count = vertex_count;
 			}
 
 			if (index_array_rd.is_valid()) {
@@ -596,11 +595,40 @@ void RenderForwardClusteredMesh::_render_list_template(RenderingDevice::DrawList
 			RID attrib_buffer = mesh_storage->get_singleton()->mesh_surface_get_attrib_buffer(mesh_surface);
 			if (attrib_buffer.is_valid()) {
 				push_constant.mesh_shader.attrib_buffer = RD::get_singleton()->buffer_get_device_address(attrib_buffer);
-				uint32_t color_stride = mesh_storage->get_singleton()->mesh_surface_get_color_stride(mesh_surface);
-				uint32_t uv_stride = mesh_storage->get_singleton()->mesh_surface_get_uv_stride(mesh_surface);
-				uint32_t uv2_stride = mesh_storage->get_singleton()->mesh_surface_get_uv2_stride(mesh_surface);
-				push_constant.mesh_shader.packed_attrib = (color_stride & 0xF) | ((uv_stride & 0xF) << 4) | ((uv2_stride & 0xF) << 8);
 			}
+
+			RID skin_buffer = mesh_storage->get_singleton()->mesh_surface_get_skin_buffer(mesh_surface);
+			if (skin_buffer.is_valid()) {
+				push_constant.mesh_shader.bone_buffer = RD::get_singleton()->buffer_get_device_address(skin_buffer);
+			}
+			
+			if (surf->owner->mesh_instance.is_valid()) {
+				RID prev_vertex_buffer = mesh_storage->mesh_instance_get_prev_vertex_buffer(
+					surf->owner->mesh_instance, 
+					surf->surface_index
+				);
+	
+				if (prev_vertex_buffer.is_valid()) {
+					push_constant.mesh_shader.prev_vertex_buffer = RD::get_singleton()->buffer_get_device_address(prev_vertex_buffer);
+				}
+				else
+				{
+					push_constant.mesh_shader.prev_vertex_buffer = push_constant.mesh_shader.vertex_buffer;
+				}
+			}
+			else {
+				push_constant.mesh_shader.prev_vertex_buffer = push_constant.mesh_shader.vertex_buffer;
+			}
+
+			uint32_t color_stride = mesh_storage->get_singleton()->mesh_surface_get_color_stride(mesh_surface);
+			uint32_t uv_stride = mesh_storage->get_singleton()->mesh_surface_get_uv_stride(mesh_surface);
+			uint32_t uv2_stride = mesh_storage->get_singleton()->mesh_surface_get_uv2_stride(mesh_surface);
+			uint32_t skin_stride = mesh_storage->get_singleton()->mesh_surface_get_skin_stride(mesh_surface);
+			uint32_t skin_offset = mesh_storage->get_singleton()->mesh_surface_get_skin_offset(mesh_surface);
+			uint32_t vertex_stride = mesh_storage->get_singleton()->mesh_surface_get_vertex_stride(mesh_surface);
+			uint32_t normal_tangent_stride = mesh_storage->get_singleton()->mesh_surface_get_normal_tangent_stride(mesh_surface);
+			push_constant.mesh_shader.packed_attrib = (color_stride & 0xF) | ((uv_stride & 0xF) << 4) | ((uv2_stride & 0xF) << 8) | ((skin_stride & 0xF) << 12) |
+				                                      ((skin_offset & 0xF) << 16) | ((vertex_stride & 0xF) << 20) | ((normal_tangent_stride & 0xF) << 24);
 
 			size_t push_constant_size = 0;
 			if (pipeline_key.ubershader) {

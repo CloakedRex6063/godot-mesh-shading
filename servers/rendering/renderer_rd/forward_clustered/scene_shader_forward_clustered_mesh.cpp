@@ -362,7 +362,7 @@ void SceneShaderForwardClusteredMesh::ShaderData::_create_pipeline(PipelineKey p
 	bool use_stencil = stencil_enabled && p_pipeline_key.version == PIPELINE_VERSION_COLOR_PASS;
 	depth_stencil_state.enable_stencil = use_stencil;
 	if (use_stencil) {
-		static const RD::CompareOperator stencil_compare_rd_table[STENCIL_COMPARE_MAX] = {
+		static constexpr RD::CompareOperator stencil_compare_rd_table[STENCIL_COMPARE_MAX] = {
 			RD::COMPARE_OP_LESS,
 			RD::COMPARE_OP_EQUAL,
 			RD::COMPARE_OP_LESS_OR_EQUAL,

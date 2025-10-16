@@ -476,7 +476,7 @@ public:
 
 	_FORCE_INLINE_ uint32_t mesh_surface_has_normal(void* surface) {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(surface);
-		return s->format & RS::ARRAY_FORMAT_NORMAL;;
+		return s->format & RS::ARRAY_FORMAT_NORMAL;
 	}
 
 	_FORCE_INLINE_ uint32_t mesh_surface_has_tangent(void* surface) {
@@ -529,6 +529,20 @@ public:
 			return 1;
 		}
 		return 2;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_skin_stride(void *p_surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(p_surface);
+		if (!s->skin_buffer_size)
+		{
+			return 0;
+		}
+		return (s->skin_buffer_size / s->vertex_count) / 4;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_skin_offset(void *p_surface) {
+		Mesh::Surface *s = static_cast<Mesh::Surface *>(p_surface);
+		return (s->format & RS::ARRAY_FLAG_USE_8_BONE_WEIGHTS) ? 4 : 2;
 	}
 
 	_FORCE_INLINE_ AABB mesh_surface_get_aabb(void *p_surface) {
@@ -586,6 +600,12 @@ public:
 		return s->vertex_buffer;
 	}
 
+	_FORCE_INLINE_ RID mesh_instance_get_prev_vertex_buffer(const RID p_mesh_instance, uint32_t p_surface_index) const {
+		MeshInstance *mi = mesh_instance_owner.get_or_null(p_mesh_instance);
+		const MeshInstance::Surface surface = mi->surfaces[p_surface_index];
+		return surface.vertex_buffer[surface.previous_buffer];
+	}
+
 	_FORCE_INLINE_ RID mesh_surface_get_attrib_buffer(void *p_surface) const {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 		return s->attribute_buffer;
@@ -595,7 +615,16 @@ public:
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 		return s->attribute_buffer_size;
 	}
-	
+
+	_FORCE_INLINE_ RID mesh_surface_get_skin_buffer(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->skin_buffer;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_skin_buffer_size(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->skin_buffer_size;
+	}
 	
 	_FORCE_INLINE_ void mesh_surface_get_vertex_arrays_and_format(void *p_surface, uint64_t p_input_mask, bool p_input_motion_vectors, RID &r_vertex_array_rd, RD::VertexFormatID &r_vertex_format) {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);

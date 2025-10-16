@@ -38,15 +38,25 @@ layout(buffer_reference, std430, buffer_reference_align = 4) buffer AttribBuffer
 	uint attribs[];
 };
 
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer SkinBuffer
+{
+	uint skins[];
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer PrevVertexBuffer
+{
+	uint vertices[];
+};
+
 layout(push_constant, std430) uniform DrawCall {
 	VertexBuffer vertex_buffer;
 	IndexBuffer index_buffer;
-	AttribBuffer attrib_buffer;
-	uvec2 padding;
 	
-	uint vertex_count;
-	uint vertex_stride;
-	uint normal_tangent_stride;
+	AttribBuffer attrib_buffer;
+	SkinBuffer skin_buffer;
+	
+	PrevVertexBuffer prev_vertex_buffer;
+	uint vertex_count; 
 	uint packed_attrib;
 	
 	uint instance_index;
@@ -75,6 +85,31 @@ uint uv_stride()
 uint uv2_stride()
 {
 	return ((draw_call.packed_attrib >> 8u)) & 0xFu;
+}
+
+uint skin_offset()
+{
+	return ((draw_call.packed_attrib >> 12u)) & 0xFu;
+}
+
+uint skin_weight_offset()
+{
+	return ((draw_call.packed_attrib >> 16u)) & 0xFu;
+}
+
+uint vertex_stride()
+{
+	return ((draw_call.packed_attrib >> 20u)) & 0xFu;
+}
+
+uint normal_tangent_stride()
+{
+	return ((draw_call.packed_attrib >> 24u)) & 0xFu;
+}
+
+uint vertex_count()
+{
+	return draw_call.vertex_count;
 }
 
 /* Specialization Constants */
