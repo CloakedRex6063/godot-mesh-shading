@@ -70,6 +70,7 @@ private:
 		Mutex *mutex = nullptr;
 		CharString uniforms;
 		CharString vertex_globals;
+		CharString mesh_globals;
 		CharString compute_globals;
 		CharString fragment_globals;
 		HashMap<StringName, CharString> code_sections;
@@ -110,6 +111,7 @@ private:
 				TYPE_VERSION_DEFINES,
 				TYPE_MATERIAL_UNIFORMS,
 				TYPE_VERTEX_GLOBALS,
+				TYPE_MESH_GLOBALS,
 				TYPE_FRAGMENT_GLOBALS,
 				TYPE_COMPUTE_GLOBALS,
 				TYPE_CODE,
@@ -124,6 +126,7 @@ private:
 	};
 
 	bool is_compute = false;
+	bool is_mesh = false;
 
 	String name;
 
@@ -170,7 +173,7 @@ private:
 protected:
 	ShaderRD();
 	void setup(const char *p_vertex_code, const char *p_fragment_code, const char *p_compute_code, const char *p_name);
-	void setup(const char *p_mesh_code, const char *p_task_code, const char *p_name);
+	void setup(const char *p_mesh_code, const char *p_task_code, const char *p_fragment_code, const char *p_compute_code, const char *p_name);
 
 public:
 	RID version_create(bool p_embedded = true);

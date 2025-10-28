@@ -59,6 +59,9 @@ void ShaderRD::_add_stage(const char *p_code, StageType p_stage_type) {
 				case STAGE_TYPE_VERTEX:
 					chunk.type = StageTemplate::Chunk::TYPE_VERTEX_GLOBALS;
 					break;
+				case STAGE_TYPE_MESH:
+					chunk.type = StageTemplate::Chunk::TYPE_MESH_GLOBALS;
+					break;
 				case STAGE_TYPE_FRAGMENT:
 					chunk.type = StageTemplate::Chunk::TYPE_FRAGMENT_GLOBALS;
 					break;
@@ -164,14 +167,18 @@ void ShaderRD::setup(const char *p_vertex_code, const char *p_fragment_code, con
 	base_sha256 = tohash.as_string().sha256_text();
 }
 
-void ShaderRD::setup(const char *p_mesh_code, const char *p_task_code, const char *p_name) {
+void ShaderRD::setup(const char *p_mesh_code, const char *p_task_code, const char *p_fragment_code, const char *p_compute_code, const char *p_name) {
 	name = p_name;
+	is_mesh = true;
 
 	if (p_mesh_code) {
 		_add_stage(p_mesh_code, STAGE_TYPE_MESH);
 	}
 	if (p_task_code) {
 		_add_stage(p_task_code, STAGE_TYPE_TASK);
+	}
+	if (p_fragment_code) {
+		_add_stage(p_fragment_code, STAGE_TYPE_FRAGMENT);
 	}
 
 	StringBuilder tohash;
@@ -183,6 +190,11 @@ void ShaderRD::setup(const char *p_mesh_code, const char *p_task_code, const cha
 	tohash.append(p_mesh_code ? p_mesh_code : "");
 	tohash.append("[Task]");
 	tohash.append(p_task_code ? p_task_code : "");
+	tohash.append("[Fragment]");
+	tohash.append(p_fragment_code ? p_fragment_code : "");
+	tohash.append("[Compute]");
+	tohash.append(p_compute_code ? p_compute_code : "");
+	
 	tohash.append("[DebugInfo]");
 	tohash.append(Engine::get_singleton()->is_generate_spirv_debug_info_enabled() ? "1" : "0");
 
@@ -270,6 +282,9 @@ void ShaderRD::_build_variant_code(StringBuilder &builder, uint32_t p_variant, c
 			case StageTemplate::Chunk::TYPE_VERTEX_GLOBALS: {
 				builder.append(p_version->vertex_globals.get_data()); // vertex globals
 			} break;
+			case StageTemplate::Chunk::TYPE_MESH_GLOBALS: {
+				builder.append(p_version->mesh_globals.get_data()); // mesh globals
+			} break;
 			case StageTemplate::Chunk::TYPE_FRAGMENT_GLOBALS: {
 				builder.append(p_version->fragment_globals.get_data()); // fragment globals
 			} break;
@@ -302,7 +317,15 @@ Vector<String> ShaderRD::_build_variant_stage_sources(uint32_t p_variant, Compil
 		_build_variant_code(builder, p_variant, p_data.version, stage_templates[STAGE_TYPE_COMPUTE]);
 		stage_sources.write[RD::SHADER_STAGE_COMPUTE] = builder.as_string();
 	} else {
+
+		if (is_mesh)
 		{
+			// Mesh stage.
+			StringBuilder builder;
+			_build_variant_code(builder, p_variant, p_data.version, stage_templates[STAGE_TYPE_MESH]);
+			stage_sources.write[RD::SHADER_STAGE_MESH] = builder.as_string();
+		}
+		else {
 			// Vertex stage.
 			StringBuilder builder;
 			_build_variant_code(builder, p_variant, p_data.version, stage_templates[STAGE_TYPE_VERTEX]);
@@ -366,14 +389,26 @@ RS::ShaderNativeSourceCode ShaderRD::version_get_native_source_code(RID p_versio
 		if (!is_compute) {
 			//vertex stage
 
-			StringBuilder builder;
-			_build_variant_code(builder, i, version, stage_templates[STAGE_TYPE_VERTEX]);
+			if (is_mesh) {
+				StringBuilder builder;
+				_build_variant_code(builder, i, version, stage_templates[STAGE_TYPE_MESH]);
 
-			RS::ShaderNativeSourceCode::Version::Stage stage;
-			stage.name = "vertex";
-			stage.code = builder.as_string();
+				RS::ShaderNativeSourceCode::Version::Stage stage;
+				stage.name = "mesh";
+				stage.code = builder.as_string();
 
-			source_code.versions.write[i].stages.push_back(stage);
+				source_code.versions.write[i].stages.push_back(stage);
+			}
+			else {
+				StringBuilder builder;
+				_build_variant_code(builder, i, version, stage_templates[STAGE_TYPE_VERTEX]);
+
+				RS::ShaderNativeSourceCode::Version::Stage stage;
+				stage.name = "vertex";
+				stage.code = builder.as_string();
+
+				source_code.versions.write[i].stages.push_back(stage);
+			}
 		}
 
 		if (!is_compute) {
@@ -420,6 +455,8 @@ String ShaderRD::_version_get_sha1(Version *p_version) const {
 	hash_build.append(p_version->uniforms.get_data());
 	hash_build.append("[vertex_globals]");
 	hash_build.append(p_version->vertex_globals.get_data());
+	hash_build.append("[mesh_globals]");
+	hash_build.append(p_version->mesh_globals.get_data());
 	hash_build.append("[fragment_globals]");
 	hash_build.append(p_version->fragment_globals.get_data());
 	hash_build.append("[compute_globals]");
@@ -642,8 +679,14 @@ void ShaderRD::version_set_code(RID p_version, const HashMap<String, String> &p_
 	MutexLock lock(*version->mutex);
 
 	_compile_ensure_finished(version);
-
-	version->vertex_globals = p_vertex_globals.utf8();
+	
+	if (is_mesh) {
+		version->mesh_globals = p_vertex_globals.utf8();
+	}
+	else {
+		version->vertex_globals = p_vertex_globals.utf8();
+	}
+	
 	version->fragment_globals = p_fragment_globals.utf8();
 	version->uniforms = p_uniforms.utf8();
 	version->code_sections.clear();

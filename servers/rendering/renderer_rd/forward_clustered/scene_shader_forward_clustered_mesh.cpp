@@ -595,6 +595,24 @@ RendererRD::MaterialStorage::MaterialData *SceneShaderForwardClusteredMesh::_cre
 	return material_data;
 }
 
+void SceneShaderForwardClusteredMesh::create_mesh_shader(RD::FramebufferFormatID id) {
+	RID version = singleton->mesh_shader.version_create(false);
+	RID shader_rid = singleton->mesh_shader.version_get_shader(version, 0);
+	RenderingDevice* rd = RenderingDevice::get_singleton();
+	RD::RenderPrimitive primitive_rd = RD::RENDER_PRIMITIVE_TRIANGLES;
+	RD::PipelineRasterizationState raster_state{};
+	raster_state.cull_mode = RD::POLYGON_CULL_DISABLED;
+	raster_state.wireframe = false;
+	RD::PipelineMultisampleState multisample_state{};
+	RD::PipelineDepthStencilState depth_stencil_state{};
+	depth_stencil_state.enable_depth_test = true;
+	depth_stencil_state.enable_depth_write = true;
+	depth_stencil_state.depth_compare_operator = RD::COMPARE_OP_GREATER_OR_EQUAL;
+
+	RD::PipelineColorBlendState blend_state = RD::PipelineColorBlendState::create_disabled(3);
+	mesh_pipeline = rd->render_pipeline_create(shader_rid, id, -1, primitive_rd, raster_state, multisample_state, depth_stencil_state, blend_state, 0, 0, {});
+}
+
 SceneShaderForwardClusteredMesh *SceneShaderForwardClusteredMesh::singleton = nullptr;
 Mutex SceneShaderForwardClusteredMesh::singleton_mutex;
 
@@ -669,10 +687,11 @@ void SceneShaderForwardClusteredMesh::init(const String p_defines) {
 		}
 
 		shader.initialize(shader_versions, p_defines);
-
 		if (RendererCompositorRD::get_singleton()->is_xr_enabled()) {
 			shader.enable_group(SHADER_GROUP_MULTIVIEW);
 		}
+
+		mesh_shader.initialize(shader_versions, p_defines);
 	}
 
 	material_storage->shader_set_data_request_function(RendererRD::MaterialStorage::SHADER_TYPE_3D, _create_shader_funcs);
@@ -883,6 +902,11 @@ void SceneShaderForwardClusteredMesh::init(const String p_defines) {
 	}
 
 	{
+		default_mesh_shader = material_storage->shader_allocate();
+		material_storage->shader_initialize(default_mesh_shader);
+		material_storage->shader_set_code(default_mesh_shader,"");
+		mesh_shader_version = mesh_shader.version_create(false);
+		
 		//default material and shader
 		default_shader = material_storage->shader_allocate();
 		material_storage->shader_initialize(default_shader);
@@ -901,10 +925,16 @@ void fragment() {
 	METALLIC = 0.2;
 }
 )");
+		default_mesh_material = material_storage->material_allocate();
+		material_storage->material_initialize(default_mesh_material);
+		material_storage->material_set_shader(default_mesh_material, default_mesh_shader);
+		
 		default_material = material_storage->material_allocate();
 		material_storage->material_initialize(default_material);
 		material_storage->material_set_shader(default_material, default_shader);
-
+		
+		default_mesh_shader_rd = mesh_shader.version_get_shader(mesh_shader_version, PIPELINE_VERSION_COLOR_PASS);
+		
 		MaterialData *md = static_cast<MaterialData *>(material_storage->material_get_data(default_material, RendererRD::MaterialStorage::SHADER_TYPE_3D));
 		default_shader_rd = md->shader_data->get_shader_variant(PIPELINE_VERSION_COLOR_PASS, 0, false);
 
@@ -971,6 +1001,7 @@ void fragment() {
 
 		default_vec4_xform_uniform_set = RD::get_singleton()->uniform_set_create(uniforms, default_shader_rd, RenderForwardClusteredMesh::TRANSFORMS_UNIFORM_SET);
 	}
+	
 	{
 		RD::SamplerState sampler;
 		sampler.mag_filter = RD::SAMPLER_FILTER_LINEAR;

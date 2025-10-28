@@ -87,12 +87,15 @@ private:
 
 			RID meshlet_buffer;
 			uint32_t meshlet_buffer_size = 0;
+			uint32_t meshlet_count = 0;
 
 			RID meshlet_vertex_buffer;
 			uint32_t meshlet_vertex_buffer_size = 0;
+			uint32_t meshlet_vertex_count = 0;
 
 			RID meshlet_triangle_buffer;
 			uint32_t meshlet_triangle_buffer_size = 0;
+			uint32_t meshlet_triangle_count = 0;
 			
 			RID skin_buffer;
 			uint32_t skin_buffer_size = 0;
@@ -383,7 +386,7 @@ public:
 
 	/// Return stride
 	virtual void mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface) override;
-
+	
 	virtual int mesh_get_blend_shape_count(RID p_mesh) const override;
 
 	virtual void mesh_set_blend_shape_mode(RID p_mesh, RS::BlendShapeMode p_mode) override;
@@ -416,6 +419,8 @@ public:
 	virtual void mesh_debug_usage(List<RS::MeshInfo> *r_info) override;
 
 	virtual bool mesh_needs_instance(RID p_mesh, bool p_has_skeleton) override;
+
+	virtual void mesh_surface_generate_meshlets(void* p_surface);
 
 	_FORCE_INLINE_ const RID *mesh_get_surface_count_and_materials(RID p_mesh, uint32_t &r_surface_count) {
 		Mesh *mesh = mesh_owner.get_or_null(p_mesh);
@@ -624,6 +629,51 @@ public:
 	_FORCE_INLINE_ uint32_t mesh_surface_get_skin_buffer_size(void *p_surface) const {
 		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
 		return s->skin_buffer_size;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_meshlet_count(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_count;
+	}
+
+	_FORCE_INLINE_ RID mesh_surface_get_meshlet_buffer(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_buffer;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_meshlet_buffer_size(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_buffer_size;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_meshlet_vertex_count(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_vertex_count;
+	}
+	
+	_FORCE_INLINE_ RID mesh_surface_get_meshlet_vertex_buffer(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_vertex_buffer;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_meshlet_vertex_buffer_size(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_vertex_buffer_size;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_meshlet_triangle_count(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_triangle_count;
+	}
+	
+	_FORCE_INLINE_ RID mesh_surface_get_meshlet_triangle_buffer(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_triangle_buffer;
+	}
+
+	_FORCE_INLINE_ uint32_t mesh_surface_get_meshlet_triangle_buffer_size(void *p_surface) const {
+		Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		return s->meshlet_triangle_buffer_size;
 	}
 	
 	_FORCE_INLINE_ void mesh_surface_get_vertex_arrays_and_format(void *p_surface, uint64_t p_input_mask, bool p_input_motion_vectors, RID &r_vertex_array_rd, RD::VertexFormatID &r_vertex_format) {

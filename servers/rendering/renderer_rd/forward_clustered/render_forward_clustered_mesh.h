@@ -167,12 +167,13 @@ private:
 	virtual void setup_render_buffer_data(Ref<RenderSceneBuffersRD> p_render_buffers) override;
 
 	RID render_base_uniform_set;
+	RID mesh_render_base_uniform_set;
 
 	uint64_t lightmap_texture_array_version = 0xFFFFFFFF;
 
 	void _update_render_base_uniform_set();
 	RID _setup_sdfgi_render_pass_uniform_set(RID p_albedo_texture, RID p_emission_texture, RID p_emission_aniso_texture, RID p_geom_facing_texture, const RendererRD::MaterialStorage::Samplers &p_samplers);
-	RID _setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, bool p_use_directional_shadow_atlas = false, int p_index = 0);
+	RID _setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, bool p_use_directional_shadow_atlas = false, int p_index = 0, int p_type = 0);
 
 	struct BestFitNormal {
 		BestFitNormalShaderRD shader;
@@ -557,6 +558,7 @@ private:
 		uint32_t gi_offset_cache = 0;
 		bool store_transform_cache = true;
 		RID transforms_uniform_set;
+		RID mesh_transform_uniform_set;
 		uint32_t instance_count = 0;
 		uint32_t trail_steps = 1;
 		bool can_sdfgi = false;

@@ -23,6 +23,7 @@
 #define TANGENT_USED
 #endif
 
+#ifdef MESHSHADER
 layout(buffer_reference, std430, buffer_reference_align = 4) buffer VertexBuffer
 {
 	uint vertices[];
@@ -47,8 +48,10 @@ layout(buffer_reference, std430, buffer_reference_align = 4) buffer PrevVertexBu
 {
 	uint vertices[];
 };
+#endif
 
 layout(push_constant, std430) uniform DrawCall {
+#ifdef MESHSHADER
 	VertexBuffer vertex_buffer;
 	IndexBuffer index_buffer;
 	
@@ -58,6 +61,7 @@ layout(push_constant, std430) uniform DrawCall {
 	PrevVertexBuffer prev_vertex_buffer;
 	uint vertex_count; 
 	uint packed_attrib;
+#endif
 	
 	uint instance_index;
 	uint uv_offset;
@@ -72,6 +76,7 @@ layout(push_constant, std430) uniform DrawCall {
 }
 draw_call;
 
+#ifdef MESHSHADER
 uint color_stride()
 {
 	return draw_call.packed_attrib & 0xFu;
@@ -111,6 +116,7 @@ uint vertex_count()
 {
 	return draw_call.vertex_count;
 }
+#endif
 
 /* Specialization Constants */
 

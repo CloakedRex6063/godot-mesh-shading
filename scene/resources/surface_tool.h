@@ -244,7 +244,13 @@ public:
 	void append_from(const Ref<Mesh> &p_existing, int p_surface, const Transform3D &p_xform);
 	Ref<ArrayMesh> commit(const Ref<ArrayMesh> &p_existing = Ref<ArrayMesh>(), uint64_t p_compress_flags = 0);
 
-	static void create_meshlets_from_mesh(Vector<RenderingServer::Meshlet> *p_meshlets, Vector<uint32_t> *p_meshlet_vertices, Vector<uint32_t> *p_meshlet_triangles, const RenderingServer::SurfaceData& surface_data, size_t max_vertices = 64, size_t max_triangles = 124);
+	static void create_meshlets_from_mesh(
+			Vector<RenderingServer::Meshlet>* p_meshlets,
+			Vector<uint32_t>* p_meshlet_vertices,
+			Vector<uint32_t>* p_meshlet_triangles,
+			Vector<uint8_t>* vertex_data,
+			const Span<uint8_t>& index_data, uint32_t vertex_count, uint32_t index_count, size_t max_vertices = 64, size_t
+			max_triangles = 124);
 	
 	SurfaceTool();
 };

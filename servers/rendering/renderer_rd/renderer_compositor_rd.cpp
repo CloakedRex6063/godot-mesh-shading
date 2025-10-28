@@ -340,7 +340,14 @@ RendererCompositorRD::RendererCompositorRD() {
 		}
 		scene = memnew(RendererSceneRenderImplementation::RenderForwardMobile());
 	} else if (rendering_method == "forward_plus") {
-		scene = memnew(RendererSceneRenderImplementation::RenderForwardClusteredMesh());
+		RenderingServer *rs = RenderingServer::get_singleton();
+		RenderingDevice *rd = rs->get_rendering_device();
+		if (rd && rd->has_feature(RenderingDeviceCommons::Features::SUPPORTS_MESH_SHADER)) {
+			scene = memnew(RendererSceneRenderImplementation::RenderForwardClusteredMesh());
+		}
+		else {
+			scene = memnew(RendererSceneRenderImplementation::RenderForwardClustered());
+		}
 	} else {
 		// Fall back to our high end renderer.
 		ERR_PRINT(vformat("Cannot instantiate RenderingDevice-based renderer with renderer type '%s'. Defaulting to Forward+ renderer.", rendering_method));

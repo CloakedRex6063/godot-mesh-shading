@@ -164,7 +164,7 @@ public:
 
         if header_data.mesh_lines:
             file.write(f"""\
-		    setup(_mesh_code, _task_code, "{class_name}");
+		    setup(_mesh_code, _task_code, _fragment_code, _compute_code, "{class_name}");
 	    }}
 }};
 """)

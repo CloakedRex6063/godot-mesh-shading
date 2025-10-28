@@ -411,42 +411,6 @@ void MeshStorage::mesh_add_surface(RID p_mesh, const RS::SurfaceData &p_surface)
 		}
 	}
 
-	RenderingServer *rs = RenderingServer::get_singleton();
-	RenderingDevice *rd = rs->get_rendering_device();
-	
-	if (rd && rd->has_feature(RenderingDeviceCommons::Features::SUPPORTS_MESH_SHADER)) 
-	{
-		if (new_surface.lods.size()) {
-			if (new_surface.index_count) {
-				const Ref<SurfaceTool> st = memnew(SurfaceTool);
-				Vector<RS::Meshlet> meshlets;
-				Vector<uint32_t> meshlet_vertices;
-				Vector<uint32_t> meshlet_triangles;
-
-				st->create_meshlets_from_mesh(&meshlets, &meshlet_vertices, &meshlet_triangles, new_surface);
-				new_surface.meshlet_data.resize(meshlets.size() * sizeof(RS::Meshlet));
-				new_surface.meshlet_vertex_data.resize(meshlet_vertices.size() * sizeof(uint32_t));
-				new_surface.meshlet_triangle_data.resize(meshlet_triangles.size() * sizeof(uint32_t));
-				memcpy(new_surface.meshlet_data.ptrw(), meshlets.ptr(), meshlets.size() * sizeof(RS::Meshlet));
-				memcpy(new_surface.meshlet_vertex_data.ptrw(), meshlet_vertices.ptr(), meshlet_vertices.size() * sizeof(uint32_t));
-				memcpy(new_surface.meshlet_triangle_data.ptrw(), meshlet_triangles.ptr(), meshlet_triangles.size() * sizeof(uint32_t));
-				new_surface.meshlet_triangle_count = meshlet_triangles.size();
-				new_surface.meshlet_count = meshlets.size();
-				new_surface.meshlet_vertex_count = meshlet_vertices.size();
-
-				s->meshlet_buffer = RD::get_singleton()->storage_buffer_create(new_surface.meshlet_data.size(), new_surface.meshlet_data);
-				s->meshlet_buffer_size = new_surface.meshlet_data.size();
-
-				s->meshlet_vertex_buffer = RD::get_singleton()->storage_buffer_create(new_surface.meshlet_vertex_data.size(), new_surface.meshlet_vertex_data);
-				s->meshlet_vertex_buffer_size = new_surface.meshlet_vertex_data.size();
-
-				//TODO: meshlet triangle buffer
-				
-			}
-			
-		}
-	}
-
 	if (new_surface.attribute_data.size()) {
 		s->attribute_buffer = RD::get_singleton()->vertex_buffer_create(new_surface.attribute_data.size(), new_surface.attribute_data, flags);
 		s->attribute_buffer_size = new_surface.attribute_data.size();
@@ -575,6 +539,15 @@ void MeshStorage::_mesh_surface_clear(Mesh *p_mesh, int p_surface) {
 	}
 	if (s.skin_buffer.is_valid()) {
 		RD::get_singleton()->free(s.skin_buffer);
+	}
+	if (s.meshlet_buffer.is_valid()) {
+		RD::get_singleton()->free(s.meshlet_buffer);
+	}
+	if (s.meshlet_triangle_buffer.is_valid()) {
+		RD::get_singleton()->free(s.meshlet_triangle_buffer);
+	}
+	if (s.meshlet_vertex_buffer.is_valid()) {
+		RD::get_singleton()->free(s.meshlet_vertex_buffer);
 	}
 	if (s.versions) {
 		memfree(s.versions); // reallocs, so free with memfree.
@@ -1034,6 +1007,50 @@ bool MeshStorage::mesh_needs_instance(RID p_mesh, bool p_has_skeleton) {
 	ERR_FAIL_NULL_V(mesh, false);
 
 	return mesh->blend_shape_count > 0 || (mesh->has_bone_weights && p_has_skeleton);
+}
+
+void MeshStorage::mesh_surface_generate_meshlets(void *p_surface) {
+	Mesh::Surface *s = reinterpret_cast<Mesh::Surface *>(p_surface);
+		RenderingServer *rs = RenderingServer::get_singleton();
+	RenderingDevice *rd = rs->get_rendering_device();
+
+	if (rd && rd->has_feature(RenderingDeviceCommons::Features::SUPPORTS_MESH_SHADER)) {
+		const Ref<SurfaceTool> st = memnew(SurfaceTool);
+		Vector<RS::Meshlet> meshlets;
+		Vector<uint32_t> meshlet_vertices;
+		Vector<uint32_t> meshlet_triangles;
+		
+		Vector<uint8_t> index_data;
+		Vector<uint8_t> vertex_data = rd->buffer_get_data(mesh_surface_get_vertex_buffer(p_surface));
+		uint32_t vertex_count = mesh_surface_get_vertex_count(p_surface);
+		uint32_t index_count = mesh_surface_get_index_count(p_surface);
+		if (index_count) {
+			index_data = rd->buffer_get_data(mesh_surface_get_index_buffer(p_surface));
+		}
+		st->create_meshlets_from_mesh(&meshlets, &meshlet_vertices, &meshlet_triangles, &vertex_data, index_data, vertex_count, index_count);
+
+		Vector<uint8_t> meshlet_data;
+		Vector<uint8_t> meshlet_vertex_data;
+		Vector<uint8_t> meshlet_triangle_data;
+		meshlet_data.resize(meshlets.size() * sizeof(RS::Meshlet));
+		meshlet_vertex_data.resize(meshlet_vertices.size() * sizeof(uint32_t));
+		meshlet_triangle_data.resize(meshlet_triangles.size() * sizeof(uint32_t));
+		memcpy(meshlet_data.ptrw(), meshlets.ptr(), meshlets.size() * sizeof(RS::Meshlet));
+		memcpy(meshlet_vertex_data.ptrw(), meshlet_vertices.ptr(), meshlet_vertices.size() * sizeof(uint32_t));
+		memcpy(meshlet_triangle_data.ptrw(), meshlet_triangles.ptr(), meshlet_triangles.size() * sizeof(uint32_t));
+
+		s->meshlet_count = meshlets.size();
+		s->meshlet_buffer = RD::get_singleton()->storage_buffer_create(meshlet_data.size(), meshlet_data, 0, RD::BUFFER_CREATION_DEVICE_ADDRESS_BIT);
+		s->meshlet_buffer_size = meshlet_data.size();
+
+		s->meshlet_vertex_count = meshlet_vertices.size();
+		s->meshlet_vertex_buffer = RD::get_singleton()->storage_buffer_create(meshlet_vertex_data.size(), meshlet_vertex_data, 0, RD::BUFFER_CREATION_DEVICE_ADDRESS_BIT);
+		s->meshlet_vertex_buffer_size = meshlet_vertex_data.size();
+
+		s->meshlet_triangle_count = meshlet_triangles.size();
+		s->meshlet_triangle_buffer = RD::get_singleton()->storage_buffer_create(meshlet_triangle_data.size(), meshlet_triangle_data, 0, RD::BUFFER_CREATION_DEVICE_ADDRESS_BIT);
+		s->meshlet_triangle_buffer_size = meshlet_triangle_data.size();
+	}
 }
 
 Dependency *MeshStorage::mesh_get_dependency(RID p_mesh) const {

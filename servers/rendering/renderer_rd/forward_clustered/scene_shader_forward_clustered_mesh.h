@@ -33,6 +33,7 @@
 #include "../storage_rd/material_storage.h"
 #include "servers/rendering/renderer_rd/pipeline_hash_map_rd.h"
 #include "servers/rendering/renderer_rd/shaders/forward_clustered/scene_forward_clustered_mesh.glsl.gen.h"
+#include "servers/rendering/renderer_rd/shaders/forward_clustered/mesh_test.glsl.gen.h"
 
 namespace RendererSceneRenderImplementation {
 
@@ -339,9 +340,18 @@ public:
 		return singleton->_create_material_func(static_cast<ShaderData *>(p_shader));
 	}
 
+	void create_mesh_shader(RD::FramebufferFormatID id);
+
 	SceneForwardClusteredMeshShaderRD shader;
+	MeshTestShaderRD mesh_shader;
 	ShaderCompiler compiler;
 
+	RID default_mesh_shader;
+	RID mesh_shader_version;
+	RID default_mesh_material;
+	RID default_mesh_shader_rd;
+	RID mesh_pipeline;
+	
 	RID default_shader;
 	RID default_material;
 	RID overdraw_material_shader;

@@ -2170,6 +2170,17 @@ void RenderForwardClusteredMesh::_render_scene(RenderDataRD *p_render_data, cons
 
 	RENDER_TIMESTAMP("Render Opaque Pass");
 
+	RendererRD::MeshStorage* mesh_storage = RendererRD::MeshStorage::get_singleton();
+	bool should_return = false;
+	for (GeometryInstanceSurfaceDataCache *element : render_list[RENDER_LIST_OPAQUE].elements) {
+		void *mesh_surface = element->surface;
+		if ((mesh_storage->mesh_surface_get_meshlet_count(mesh_surface) == 0) && (mesh_storage->mesh_surface_get_primitive(mesh_surface) == RS::PRIMITIVE_TRIANGLES)) {
+			mesh_storage->mesh_surface_generate_meshlets(mesh_surface);
+			should_return = true;
+		}
+	}
+	if (should_return) { return; }
+
 	RD::get_singleton()->draw_command_begin_label("Render Opaque Pass");
 
 	p_render_data->scene_data->directional_light_count = p_render_data->directional_light_count;
@@ -2185,29 +2196,89 @@ void RenderForwardClusteredMesh::_render_scene(RenderDataRD *p_render_data, cons
 	{
 		bool render_motion_pass = !render_list[RENDER_LIST_MOTION].elements.is_empty();
 
-		{
+		// {
+		// 	Vector<Color> c;
+		// 	if (!load_color) {
+		// 		Color cc = clear_color.srgb_to_linear();
+		// 		if (using_separate_specular || rb_data.is_valid()) {
+		// 			// Effects that rely on separate specular, like subsurface scattering, must clear the alpha to zero.
+		// 			cc.a = 0;
+		// 		}
+		// 		c.push_back(cc);
+		//
+		// 		if (rb_data.is_valid()) {
+		// 			c.push_back(Color(0, 0, 0, 0)); // Separate specular.
+		// 			c.push_back(Color(0, 0, 0, 0)); // Motion vector. Pushed to the clear color vector even if the framebuffer isn't bound.
+		// 		}
+		// 	}
+		//
+		// 	uint32_t opaque_color_pass_flags = using_motion_pass ? (color_pass_flags & ~uint32_t(COLOR_PASS_FLAG_MOTION_VECTORS)) : color_pass_flags;
+		// 	RID opaque_framebuffer = using_motion_pass ? rb_data->get_color_pass_fb(opaque_color_pass_flags) : color_framebuffer;
+		// 	RenderListParameters render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, PASS_MODE_COLOR, opaque_color_pass_flags, rb_data.is_null(), p_render_data->directional_light_soft_shadows, rp_uniform_set, get_debug_draw_mode() == RS::VIEWPORT_DEBUG_DRAW_WIREFRAME, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
+		// 	_render_list_with_draw_list(&render_list_params, opaque_framebuffer, RD::DrawFlags(load_color ? RD::DRAW_DEFAULT_ALL : RD::DRAW_CLEAR_COLOR_ALL) | (depth_pre_pass ? RD::DRAW_DEFAULT_ALL : RD::DRAW_CLEAR_DEPTH), c, 0.0f, 0u, p_render_data->render_region);
+		// }
+		//
+		// RD::get_singleton()->draw_command_end_label();
+
+		if (scene_shader.mesh_pipeline.is_valid()) {
+			RENDER_TIMESTAMP("Mesh Pass");
+
+			RD *rd = RD::get_singleton();
+			rd->draw_command_begin_label("Render Mesh Pass");
+
 			Vector<Color> c;
-			if (!load_color) {
-				Color cc = clear_color.srgb_to_linear();
-				if (using_separate_specular || rb_data.is_valid()) {
-					// Effects that rely on separate specular, like subsurface scattering, must clear the alpha to zero.
-					cc.a = 0;
-				}
-				c.push_back(cc);
+			c.push_back(clear_color.srgb_to_linear());
+			c.push_back(Color(0, 0, 0, 0));
+			c.push_back(Color(0, 0, 0, 0));
+			RD::DrawListID draw_list = RD::get_singleton()->draw_list_begin(color_framebuffer, RD::DrawFlags(load_color ? RD::DRAW_DEFAULT_ALL : RD::DRAW_CLEAR_COLOR_ALL) | RD::DRAW_CLEAR_DEPTH, c, 0.0f, 0u, p_render_data->render_region);
+			rd->draw_list_bind_render_pipeline(draw_list, scene_shader.mesh_pipeline);
 
-				if (rb_data.is_valid()) {
-					c.push_back(Color(0, 0, 0, 0)); // Separate specular.
-					c.push_back(Color(0, 0, 0, 0)); // Motion vector. Pushed to the clear color vector even if the framebuffer isn't bound.
-				}
+			for (uint32_t i = 0; i < render_list[RENDER_LIST_OPAQUE].elements.size(); i++) {
+				RID mesh_rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, false, 0, 1);
+				GeometryInstanceSurfaceDataCache *element = render_list[RENDER_LIST_OPAQUE].elements[i];
+				void *surface = element->surface;
+				if (mesh_storage->mesh_surface_get_primitive(surface) != RS::PRIMITIVE_TRIANGLES) { continue; }
+
+				struct PushConstant {
+					uint64_t vertex_buffer;
+					uint64_t mesh_vertex_buffer;
+					uint64_t mesh_triangle_buffer;
+					uint64_t meshlet_buffer;
+
+					uint64_t attrib_buffer;
+					uint32_t vertex_count;
+					uint32_t packed_attrib;
+
+					uint32_t padding;
+					uint32_t instance_index;
+					uint64_t padding2;
+				} pc{};
+
+				pc.vertex_buffer = rd->buffer_get_device_address(mesh_storage->mesh_surface_get_vertex_buffer(surface));
+				pc.mesh_vertex_buffer = rd->buffer_get_device_address(mesh_storage->mesh_surface_get_meshlet_vertex_buffer(surface));
+				pc.mesh_triangle_buffer = rd->buffer_get_device_address(mesh_storage->mesh_surface_get_meshlet_triangle_buffer(surface));
+				pc.meshlet_buffer = rd->buffer_get_device_address(mesh_storage->mesh_surface_get_meshlet_buffer(surface));
+				pc.attrib_buffer = rd->buffer_get_device_address(mesh_storage->mesh_surface_get_attrib_buffer(surface));
+				pc.attrib_buffer = rd->buffer_get_device_address(mesh_storage->mesh_surface_get_attrib_buffer(surface));
+				pc.vertex_count = mesh_storage->mesh_surface_get_vertex_count(surface);
+				uint32_t color_stride = mesh_storage->mesh_surface_get_color_stride(surface);
+				uint32_t uv_stride = mesh_storage->mesh_surface_get_uv_stride(surface);
+				uint32_t uv2_stride = mesh_storage->mesh_surface_get_uv2_stride(surface);
+				uint32_t skin_stride = mesh_storage->mesh_surface_get_skin_stride(surface);
+				uint32_t skin_offset = mesh_storage->mesh_surface_get_skin_offset(surface);
+				uint32_t vertex_stride = mesh_storage->mesh_surface_get_vertex_stride(surface);
+				uint32_t normal_tangent_stride = mesh_storage->mesh_surface_get_normal_tangent_stride(surface);
+				pc.packed_attrib = (color_stride & 0xF) | ((uv_stride & 0xF) << 4) | ((uv2_stride & 0xF) << 8) | ((skin_stride & 0xF) << 12) |
+						((skin_offset & 0xF) << 16) | ((vertex_stride & 0xF) << 20) | ((normal_tangent_stride & 0xF) << 24);
+				pc.instance_index = i;
+
+				rd->draw_list_bind_uniform_set(draw_list, mesh_rp_uniform_set, RENDER_PASS_UNIFORM_SET);
+				rd->draw_list_set_push_constant(draw_list, &pc, sizeof(PushConstant));
+				rd->draw_list_dispatch_mesh(draw_list, mesh_storage->mesh_surface_get_meshlet_count(surface), 1, 1);
 			}
-
-			uint32_t opaque_color_pass_flags = using_motion_pass ? (color_pass_flags & ~uint32_t(COLOR_PASS_FLAG_MOTION_VECTORS)) : color_pass_flags;
-			RID opaque_framebuffer = using_motion_pass ? rb_data->get_color_pass_fb(opaque_color_pass_flags) : color_framebuffer;
-			RenderListParameters render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, PASS_MODE_COLOR, opaque_color_pass_flags, rb_data.is_null(), p_render_data->directional_light_soft_shadows, rp_uniform_set, get_debug_draw_mode() == RS::VIEWPORT_DEBUG_DRAW_WIREFRAME, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
-			_render_list_with_draw_list(&render_list_params, opaque_framebuffer, RD::DrawFlags(load_color ? RD::DRAW_DEFAULT_ALL : RD::DRAW_CLEAR_COLOR_ALL) | (depth_pre_pass ? RD::DRAW_DEFAULT_ALL : RD::DRAW_CLEAR_DEPTH), c, 0.0f, 0u, p_render_data->render_region);
+			rd->draw_command_end_label();
+			rd->draw_list_end();
 		}
-
-		RD::get_singleton()->draw_command_end_label();
 
 		if (using_motion_pass) {
 			if (scale_type == SCALE_MFX) {
@@ -2235,6 +2306,7 @@ void RenderForwardClusteredMesh::_render_scene(RenderDataRD *p_render_data, cons
 			RD::get_singleton()->draw_command_end_label();
 		}
 	}
+
 
 	{
 		if (ce_post_opaque_resolved_color) {
@@ -3270,10 +3342,11 @@ void RenderForwardClusteredMesh::_update_render_base_uniform_set() {
 		}
 
 		render_base_uniform_set = RD::get_singleton()->uniform_set_create(uniforms, scene_shader.default_shader_rd, SCENE_UNIFORM_SET);
+		mesh_render_base_uniform_set = RD::get_singleton()->uniform_set_create(uniforms, scene_shader.default_mesh_shader_rd, SCENE_UNIFORM_SET);
 	}
 }
 
-RID RenderForwardClusteredMesh::_setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, bool p_use_directional_shadow_atlas, int p_index) {
+RID RenderForwardClusteredMesh::_setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, bool p_use_directional_shadow_atlas, int p_index, int p_type) {
 	RendererRD::TextureStorage *texture_storage = RendererRD::TextureStorage::get_singleton();
 	RendererRD::LightStorage *light_storage = RendererRD::LightStorage::get_singleton();
 
@@ -3622,7 +3695,8 @@ RID RenderForwardClusteredMesh::_setup_render_pass_uniform_set(RenderListType p_
 		uniforms.push_back(u);
 	}
 
-	return UniformSetCacheRD::get_singleton()->get_cache_vec(scene_shader.default_shader_rd, RENDER_PASS_UNIFORM_SET, uniforms);
+	RID rd = (p_type == 0 ? scene_shader.default_shader_rd : scene_shader.default_mesh_shader_rd);
+	return UniformSetCacheRD::get_singleton()->get_cache_vec(rd, RENDER_PASS_UNIFORM_SET, uniforms);
 }
 
 RID RenderForwardClusteredMesh::_setup_sdfgi_render_pass_uniform_set(RID p_albedo_texture, RID p_emission_texture, RID p_emission_aniso_texture, RID p_geom_facing_texture, const RendererRD::MaterialStorage::Samplers &p_samplers) {
@@ -4957,6 +5031,7 @@ RenderForwardClusteredMesh::RenderForwardClusteredMesh() {
 
 	{
 		String defines;
+		defines += "\n#define MESHSHADER\n";
 		defines += "\n#define MAX_ROUGHNESS_LOD " + itos(get_roughness_layers() - 1) + ".0\n";
 		if (is_using_radiance_cubemap_array()) {
 			defines += "\n#define USE_RADIANCE_CUBEMAP_ARRAY \n";
@@ -4998,6 +5073,8 @@ RenderForwardClusteredMesh::RenderForwardClusteredMesh() {
 #endif
 
 		scene_shader.init(defines);
+		RD::FramebufferFormatID id = _get_color_framebuffer_format_for_pipeline(RD::DATA_FORMAT_R16G16B16A16_SFLOAT, true, RD::TextureSamples(global_pipeline_data_required.texture_samples), false, false, 1);
+		scene_shader.create_mesh_shader(id);
 	}
 
 	/* shadow sampler */

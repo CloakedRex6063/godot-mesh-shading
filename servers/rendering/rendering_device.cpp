@@ -5036,22 +5036,22 @@ void RenderingDevice::draw_list_dispatch_mesh(DrawListID p_list, uint32_t p_grou
 	ERR_FAIL_COND(!draw_list.active);
 
 	#ifdef DEBUG_ENABLED
-		ERR_FAIL_COND_MSG(has_feature(SUPPORTS_MESH_SHADER), "Mesh shader is not supported by your gpu");
+		ERR_FAIL_COND_MSG(!has_feature(SUPPORTS_MESH_SHADER), "Mesh shader is not supported by your gpu");
 		ERR_FAIL_COND_MSG(p_group_count_x == 0, "Group count x must be greater than zero");
 		ERR_FAIL_COND_MSG(p_group_count_y == 0, "Group count y must be greater than zero");
 		ERR_FAIL_COND_MSG(p_group_count_z == 0, "Group count z must be greater than zero");
 		const Shader* shader = shader_owner.get_or_null(draw_list.state.pipeline_shader);
 		if(shader->stage_bits.has_flag(RDD::PIPELINE_STAGE_MESH_SHADER_BIT))
 		{
-			ERR_FAIL_COND_MSG(p_group_count_x <= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_X), "Group count x exceeds maximum allowed");
-			ERR_FAIL_COND_MSG(p_group_count_y <= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_Y), "Group count y exceeds maximum allowed");
-			ERR_FAIL_COND_MSG(p_group_count_z <= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_Z), "Group count z exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_x >= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_X), "Group count x exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_y >= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_Y), "Group count y exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_z >= driver->limit_get(LIMIT_MAX_MESH_WORKGROUP_COUNT_Z), "Group count z exceeds maximum allowed");
 		}
 		else if(shader->stage_bits.has_flag(RDD::PIPELINE_STAGE_TASK_SHADER_BIT))
 		{
-			ERR_FAIL_COND_MSG(p_group_count_x <= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_X), "Task Shader Invocation Group count x exceeds maximum allowed");
-			ERR_FAIL_COND_MSG(p_group_count_y <= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_Y), "Task Shader Invocation Group count y exceeds maximum allowed");
-			ERR_FAIL_COND_MSG(p_group_count_z <= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_Z), "Task Shader Invocation Group count z exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_x >= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_X), "Task Shader Invocation Group count x exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_y >= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_Y), "Task Shader Invocation Group count y exceeds maximum allowed");
+			ERR_FAIL_COND_MSG(p_group_count_z >= driver->limit_get(LIMIT_MAX_TASK_WORKGROUP_COUNT_Z), "Task Shader Invocation Group count z exceeds maximum allowed");
 		}
 		ERR_FAIL_COND_MSG(!draw_list.validation.pipeline_active, "No render pipeline was set before attempting to draw.");
 
