@@ -1043,12 +1043,12 @@ Error RenderingDeviceDriverVulkan::_check_device_capabilities() {
 		}
 
 		if (mesh_shader_capabilities.mesh_shader_supported){
-			mesh_shader_capabilities.max_mesh_group_count[0] = mesh_shader_properties.maxMeshWorkGroupCount[0];
-			mesh_shader_capabilities.max_mesh_group_count[1] = mesh_shader_properties.maxMeshWorkGroupCount[1];
-			mesh_shader_capabilities.max_mesh_group_count[2] = mesh_shader_properties.maxMeshWorkGroupCount[2];
-			mesh_shader_capabilities.max_task_group_count[0] = mesh_shader_properties.maxTaskWorkGroupCount[0];
-			mesh_shader_capabilities.max_task_group_count[1] = mesh_shader_properties.maxTaskWorkGroupCount[1];
-			mesh_shader_capabilities.max_task_group_count[2] = mesh_shader_properties.maxTaskWorkGroupCount[2];
+			mesh_shader_capabilities.max_mesh_group_count[0] = mesh_shader_properties.maxMeshWorkGroupTotalCount;
+			mesh_shader_capabilities.max_mesh_group_count[1] = mesh_shader_properties.maxMeshWorkGroupTotalCount;
+			mesh_shader_capabilities.max_mesh_group_count[2] = mesh_shader_properties.maxMeshWorkGroupTotalCount;
+			mesh_shader_capabilities.max_task_group_count[0] = mesh_shader_properties.maxMeshWorkGroupTotalCount;
+			mesh_shader_capabilities.max_task_group_count[1] = mesh_shader_properties.maxMeshWorkGroupTotalCount;
+			mesh_shader_capabilities.max_task_group_count[2] = mesh_shader_properties.maxMeshWorkGroupTotalCount;
 
 			print_verbose("- Vulkan mesh shader supported:");
 			print_verbose(" max mesh shader work group count: " + itos(mesh_shader_capabilities.max_mesh_group_count[0]) + "," + itos(mesh_shader_capabilities.max_mesh_group_count[1]) + "," + itos(mesh_shader_capabilities.max_mesh_group_count[2]));

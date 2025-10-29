@@ -86,10 +86,7 @@ void main()
         vec4 position = scene_data.projection_matrix * scene_data.view_matrix * model_matrix * vec4(vertex, 1.0);
 
         out_verts[lid].position = (model_matrix * vec4(vertex, 1.0)).xyz;
-        out_verts[lid].normal = vec3(
-    float(gid & 1),
-    float(gid & 3) / 4,
-    float(gid & 7) / 8);
+        out_verts[lid].normal = vec3(float((gid + 1) & 1), float((gid + 1) & 3) / 4, float((gid + 1) & 7) / 8);
         out_verts[lid].uv = uv;
         out_verts[lid].tangent = tangent;
         out_verts[lid].binormal = binormal;

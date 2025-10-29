@@ -1021,13 +1021,19 @@ void MeshStorage::mesh_surface_generate_meshlets(void *p_surface) {
 		Vector<uint32_t> meshlet_triangles;
 		
 		Vector<uint8_t> index_data;
-		Vector<uint8_t> vertex_data = rd->buffer_get_data(mesh_surface_get_vertex_buffer(p_surface));
+		RID vertex_buffer = mesh_surface_get_vertex_buffer(p_surface);
+		Vector<uint8_t> vertex_data = rd->buffer_get_data(vertex_buffer);
 		uint32_t vertex_count = mesh_surface_get_vertex_count(p_surface);
 		uint32_t index_count = mesh_surface_get_index_count(p_surface);
 		if (index_count) {
 			index_data = rd->buffer_get_data(mesh_surface_get_index_buffer(p_surface));
 		}
 		st->create_meshlets_from_mesh(&meshlets, &meshlet_vertices, &meshlet_triangles, &vertex_data, index_data, vertex_count, index_count);
+
+		if (!index_count)
+		{
+			rd->buffer_update(vertex_buffer, 0, vertex_data.size(), vertex_data.ptr());
+		}
 
 		Vector<uint8_t> meshlet_data;
 		Vector<uint8_t> meshlet_vertex_data;
