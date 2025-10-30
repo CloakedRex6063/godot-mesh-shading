@@ -1058,6 +1058,11 @@ Error RenderingDeviceDriverVulkan::_check_device_capabilities() {
 			print_verbose("- Vulkan mesh shader not supported:");
 		}
 
+		if (!mesh_shader_properties.maxMeshWorkGroupTotalCount)
+		{
+			mesh_shader_capabilities.mesh_shader_supported = false;
+		}
+
 		print_verbose("- Vulkan subgroup:");
 		print_verbose("  size: " + itos(subgroup_capabilities.size));
 		print_verbose("  min size: " + itos(subgroup_capabilities.min_size));
